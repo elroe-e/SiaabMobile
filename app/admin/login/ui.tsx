@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { LockKeyhole, Mail, Smartphone } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import type { AuthChangeEvent } from '@supabase/supabase-js'
 import { getBrowserSupabase } from '../../../src/lib/supabase/browser'
 import { getSupabasePublicConfig } from '../../../src/lib/supabase/config'
 
@@ -11,11 +12,36 @@ export function AdminLogin() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [setPasswordMode, setSetPasswordMode] = useState(false)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   let configured = true
   try { getSupabasePublicConfig() } catch { configured = false }
+
+  useEffect(() => {
+    const hash = new URLSearchParams(window.location.hash.slice(1))
+    const params = new URLSearchParams(window.location.search)
+    const authLinkType = hash.get('type')
+    const isPasswordLink = params.get('mode') === 'set-password' || authLinkType === 'invite' || authLinkType === 'recovery'
+    if (isPasswordLink) setSetPasswordMode(true)
+    if (hash.has('error_code')) {
+      const errorCode = hash.get('error_code')
+      setError(errorCode === 'otp_expired'
+        ? 'This invitation or password link has expired or was already used. Request a new link and open it promptly.'
+        : hash.get('error_description')?.replace(/\+/g, ' ') || 'The authentication link could not be verified. Request a new link.')
+    }
+
+    if (!configured) return
+    const supabase = getBrowserSupabase()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent) => {
+      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && isPasswordLink)) {
+        setSetPasswordMode(true)
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [configured])
 
   const signIn = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -31,6 +57,20 @@ export function AdminLogin() {
     router.refresh()
   }
 
+  const updatePassword = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setBusy(true)
+    setError('')
+    const { error: updateError } = await getBrowserSupabase().auth.updateUser({ password: newPassword })
+    if (updateError) {
+      setError(updateError.message)
+      setBusy(false)
+      return
+    }
+    router.replace('/admin')
+    router.refresh()
+  }
+
   const resetPassword = async () => {
     if (!email.includes('@')) {
       setError('Enter your account email first, then choose forgot password.')
@@ -39,7 +79,7 @@ export function AdminLogin() {
     setBusy(true)
     setError('')
     const { error: resetError } = await getBrowserSupabase().auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/admin/login`,
+      redirectTo: `${window.location.origin}/admin/login?mode=set-password`,
     })
     setBusy(false)
     if (resetError) setError(resetError.message)
@@ -61,9 +101,16 @@ export function AdminLogin() {
     </aside>
     <section className="admin-login-main">
       <div className="admin-login-card">
-        <h2>Welcome back</h2>
-        <p>Sign in with your shop account to continue.</p>
-        <form className="admin-login-form" onSubmit={signIn}>
+        <h2>{setPasswordMode ? 'Set your password' : 'Welcome back'}</h2>
+        <p>{setPasswordMode ? 'Choose a new password to finish setting up your shop account.' : 'Sign in with your shop account to continue.'}</p>
+        {setPasswordMode ? <form className="admin-login-form" onSubmit={updatePassword}>
+          <label className="admin-label">New password
+            <span className="input-icon-wrap"><LockKeyhole size={14} /><input className="admin-input" autoComplete="new-password" type="password" minLength={12} required value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="At least 12 characters" /></span>
+          </label>
+          {error && <div className="admin-error" role="alert">{error}</div>}
+          {notice && <div className="admin-success" role="status">{notice}</div>}
+          <button className="button button-primary" type="submit" disabled={busy || !configured}>{busy ? 'Please wait…' : 'Save password'}</button>
+        </form> : <form className="admin-login-form" onSubmit={signIn}>
           <label className="admin-label">Email address
             <span className="input-icon-wrap"><Mail size={14} /><input className="admin-input" autoComplete="username" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@yourshop.com" /></span>
           </label>
@@ -73,8 +120,8 @@ export function AdminLogin() {
           {error && <div className="admin-error" role="alert">{error}</div>}
           {notice && <div className="admin-success" role="status">{notice}</div>}
           <button className="button button-primary" type="submit" disabled={busy || !configured}>{busy ? 'Please wait…' : 'Sign in securely'}</button>
-        </form>
-        <div className="admin-login-help"><Link href="/">Back to storefront</Link><button type="button" disabled={busy || !configured} onClick={resetPassword}>Forgot password?</button></div>
+        </form>}
+        <div className="admin-login-help"><Link href="/">Back to storefront</Link>{!setPasswordMode && <button type="button" disabled={busy || !configured} onClick={resetPassword}>Forgot password?</button>}</div>
         {!configured && <div className="admin-login-config"><strong>Admin is not configured yet.</strong><br />Add the Supabase URL and public anon key to the deployment environment, then apply the database migration and provision the first owner.</div>}
         <p className="admin-inline-note" style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 20 }}><Smartphone size={12} /> Need access? Ask the shop owner to create your staff account.</p>
       </div>

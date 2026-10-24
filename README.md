@@ -37,7 +37,7 @@ npm start
    ```
 
 2. In the Supabase SQL Editor, run [`supabase/migrations/202610240001_initial_schema.sql`](./supabase/migrations/202610240001_initial_schema.sql), then [`supabase/seed.sql`](./supabase/seed.sql). The migration enables RLS, creates public-safe views, transactional sales/reservation functions, lead throttling, audit logging, photo storage policies and owner-only used-phone fields.
-3. Configure Supabase Auth's site URL and redirect allow-list for the local and production origins. Keep public sign-ups disabled; accounts are provisioned only by an owner.
+3. Configure Supabase Auth's Site URL as `http://localhost:3000/admin/login` for local development, and add `http://localhost:3000/**` to the redirect URL allow-list. In production, set the Site URL to the deployed admin login page and allow that site's `/admin/login` path. Invite and password-recovery links return to the admin login, where the user can set a password. Keep public sign-ups disabled; accounts are provisioned only by an owner.
 4. Create the first owner from a trusted local terminal. Add these local-only values to `.env.local` (never to browser variables or a deployed site's environment):
 
    ```dotenv
