@@ -1,0 +1,11 @@
+import type { UpcomingPhone } from '../types'
+
+const future = (slug: string, tone: string) =>
+  `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 600"><rect width="480" height="600" rx="32" fill="#f2f5fa"/><circle cx="350" cy="160" r="110" fill="${tone}" opacity=".15"/><rect x="139" y="90" width="202" height="400" rx="38" fill="${tone}"/><rect x="147" y="98" width="186" height="384" rx="30" fill="#14213a"/><circle cx="240" cy="110" r="4" fill="#8794aa"/><text x="240" y="550" text-anchor="middle" font-family="Arial" font-size="14" fill="#667085" letter-spacing="3">${slug.toUpperCase()}</text></svg>`) }`
+
+export const upcomingPhones: UpcomingPhone[] = [
+  { id: 'iphone16', slug: 'apple-iphone-16', brand: 'Apple', model: 'iPhone 16', expectedDate: 'October 2026', dateSort: '2026-10-01', teaser: 'A new generation of everyday magic, coming soon to Siaab.', expectedPriceRange: 'Br 95,000–120,000', keyRumoredSpecs: ['Next-generation A-series chip', 'Camera upgrades', 'Apple Intelligence features'], image: future('iphone-16', '#687a9a'), notifyEnabled: true },
+  { id: 'pixel10', slug: 'google-pixel-10', brand: 'Google', model: 'Pixel 10', expectedDate: 'November 2026', dateSort: '2026-11-01', teaser: 'Google’s helpful phone, with even more AI on board.', expectedPriceRange: 'Br 65,000–90,000', keyRumoredSpecs: ['New Tensor processor', 'Next-gen computational photography', 'Extended software support'], image: future('pixel-10', '#658a79'), notifyEnabled: true },
+  { id: 's26', slug: 'samsung-galaxy-s26', brand: 'Samsung', model: 'Galaxy S26', expectedDate: 'Early 2027', dateSort: '2027-02-01', teaser: 'The next chapter of Samsung’s flagship Galaxy line.', expectedPriceRange: 'Br 115,000–160,000', keyRumoredSpecs: ['Upgraded Galaxy AI', 'New-generation flagship chipset', 'Camera system refresh'], image: future('galaxy-s26', '#526caa'), notifyEnabled: true },
+  { id: 'nothing4', slug: 'nothing-phone-4', brand: 'Nothing', model: 'Phone (4)', expectedDate: '2027', dateSort: '2027-06-01', teaser: 'A fresh take on a phone that stands apart.', expectedPriceRange: 'To be announced', keyRumoredSpecs: ['Distinctive transparent design', 'Updated Glyph interface', 'Details not yet confirmed'], image: future('nothing-4', '#b27a59'), notifyEnabled: true },
+]

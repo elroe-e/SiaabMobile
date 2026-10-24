@@ -1,0 +1,51 @@
+[
+  {
+    "brand": "Samsung",
+    "model": "Galaxy S24 Ultra",
+    "needsReview": true,
+    "sourceUrls": ["https://www.samsung.com/global/galaxy/galaxy-s24-ultra/"],
+    "specs": {
+      "display": { "sizeInches": 6.8, "resolution": { "width": 1440, "height": 3120 }, "type": "Dynamic AMOLED 2X", "refreshRateHz": 120, "brightnessNits": 2600, "protection": "Corning Gorilla Armor" },
+      "chipset": "Qualcomm Snapdragon 8 Gen 3 for Galaxy",
+      "rearCamera": [{ "name": "Main", "megapixels": 200, "details": "OIS" }, { "name": "Ultra-wide", "megapixels": 12, "details": null }, { "name": "Telephoto", "megapixels": 50, "details": "5× optical zoom" }, { "name": "Telephoto", "megapixels": 10, "details": "3× optical zoom" }],
+      "batteryMah": 5000, "chargingWatts": 45, "fiveG": true, "nfc": true, "esim": true,
+      "os": "Android 14", "ramGb": 12, "storageGb": 256
+    }
+  },
+  {
+    "brand": "Apple",
+    "model": "iPhone 15 Pro",
+    "needsReview": true,
+    "sourceUrls": ["https://www.apple.com/iphone-15-pro/specs/"],
+    "specs": {
+      "display": { "sizeInches": 6.1, "resolution": { "width": 1179, "height": 2556 }, "type": "Super Retina XDR OLED", "refreshRateHz": 120, "brightnessNits": 2000, "protection": "Ceramic Shield" },
+      "chipset": "Apple A17 Pro", "rearCamera": [{ "name": "Main", "megapixels": 48, "details": "OIS" }, { "name": "Ultra-wide", "megapixels": 12, "details": null }, { "name": "Telephoto", "megapixels": 12, "details": "3× optical zoom" }],
+      "batteryMah": 3274, "chargingWatts": 27, "fiveG": true, "nfc": true, "esim": true,
+      "os": "iOS 17", "ramGb": 8, "storageGb": 128
+    }
+  },
+  {
+    "brand": "Google",
+    "model": "Pixel 8a",
+    "needsReview": true,
+    "sourceUrls": ["https://store.google.com/product/pixel_8a_specs"],
+    "specs": {
+      "display": { "sizeInches": 6.1, "resolution": { "width": 1080, "height": 2400 }, "type": "OLED", "refreshRateHz": 120, "brightnessNits": 2000, "protection": "Corning Gorilla Glass 3" },
+      "chipset": "Google Tensor G3", "rearCamera": [{ "name": "Main", "megapixels": 64, "details": "OIS" }, { "name": "Ultra-wide", "megapixels": 13, "details": null }],
+      "batteryMah": 4492, "chargingWatts": 18, "fiveG": true, "nfc": true, "esim": true,
+      "os": "Android 14", "ramGb": 8, "storageGb": 128
+    }
+  },
+  {
+    "brand": "Xiaomi",
+    "model": "Redmi Note 13 Pro",
+    "needsReview": true,
+    "sourceUrls": ["https://www.mi.com/global/product/redmi-note-13-pro-5g/specs/"],
+    "specs": {
+      "display": { "sizeInches": 6.67, "resolution": { "width": 1220, "height": 2712 }, "type": "AMOLED", "refreshRateHz": 120, "brightnessNits": 1800, "protection": "Corning Gorilla Glass Victus" },
+      "chipset": "Qualcomm Snapdragon 7s Gen 2", "rearCamera": [{ "name": "Main", "megapixels": 200, "details": "OIS" }, { "name": "Ultra-wide", "megapixels": 8, "details": null }, { "name": "Macro", "megapixels": 2, "details": null }],
+      "batteryMah": 5100, "chargingWatts": 67, "fiveG": true, "nfc": true, "esim": false,
+      "os": "Android 13", "ramGb": 8, "storageGb": 256
+    }
+  }
+]

@@ -1,0 +1,20 @@
+name: Keep Supabase project active
+
+on:
+  schedule:
+    - cron: '0 6 */3 * *'
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check public health endpoint
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: |
+          if [ -z "$SITE_URL" ]; then
+            echo "Set the SITE_URL repository variable to your deployed site URL."
+            exit 1
+          fi
+          curl --fail --silent --show-error --max-time 20 "${SITE_URL%/}/api/health"
