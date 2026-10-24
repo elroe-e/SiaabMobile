@@ -25,7 +25,7 @@ join public.brands b on b.name = seed.brand
 on conflict (slug) do nothing;
 
 insert into public.phone_models(brand_id, name, slug, status, expected_date, expected_price_range, tagline, specs, spec_meta, specs_reviewed)
-select b.id, seed.name, seed.slug, 'upcoming', seed.expected_date, seed.expected_price_range, seed.tagline, seed.specs,
+select b.id, seed.name, seed.slug, 'upcoming', seed.expected_date, seed.expected_price_range, seed.tagline, '{}'::jsonb,
        '{"review":{"source":"database","status":"missing","locked":false}}'::jsonb, true
 from (values
   ('Apple','iPhone 16','apple-iphone-16','October 2026','Br 95,000–120,000','Expected release details are unconfirmed.'),
