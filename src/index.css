@@ -835,3 +835,9 @@ p { color: var(--muted); line-height: 1.72; }
 .share-menu a, .share-menu button { padding: 11px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font-size: 14px; font-weight: 600; text-align: left; cursor: pointer; }
 @media (hover: hover) and (pointer: fine) { .share-menu a:hover, .share-menu button:hover { background: var(--blue-pale); } }
 .detail-actions .share-wrap { grid-column: 1 / -1; } .detail-actions .share-wrap > .button { width: 100%; }
+:lang(am), :lang(am) * { font-family: var(--font-ethiopic), var(--font-dm-sans), 'DM Sans', sans-serif; }
+:lang(am) h1, :lang(am) h2, :lang(am) h3 { letter-spacing: 0; line-height: 1.25; }
+:lang(am) .eyebrow { letter-spacing: .04em; }
+.lang-toggle { min-width: 44px; height: 37px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--white); color: var(--ink); font-size: 13px; font-weight: 700; cursor: pointer; transition: transform .16s var(--ease-out), background .16s ease; }
+.lang-toggle:active { transform: scale(.96); }
+@media (hover: hover) and (pointer: fine) { .lang-toggle:hover { background: var(--blue-pale); } }

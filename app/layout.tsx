@@ -1,8 +1,11 @@
 import type { Metadata, Viewport } from 'next'
-import { DM_Sans, Manrope } from 'next/font/google'
+import { cookies } from 'next/headers'
+import { DM_Sans, Manrope, Noto_Sans_Ethiopic } from 'next/font/google'
+import { LANGUAGE_COOKIE, parseLanguage } from '../src/i18n/language'
 import './globals.css'
 
 const dmSans = DM_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700'], display: 'swap', variable: '--font-dm-sans' })
+const ethiopic = Noto_Sans_Ethiopic({ subsets: ['ethiopic'], weight: ['400', '500', '600', '700'], display: 'swap', variable: '--font-ethiopic' })
 const manrope = Manrope({ subsets: ['latin'], weight: ['400', '500', '600', '700', '800'], display: 'swap', variable: '--font-manrope' })
 
 export const metadata: Metadata = {
@@ -21,8 +24,9 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { themeColor: '#f7f8fa' }
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en" className={`${dmSans.variable} ${manrope.variable}`}>
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const lang = parseLanguage((await cookies()).get(LANGUAGE_COOKIE)?.value)
+  return <html lang={lang} className={`${dmSans.variable} ${manrope.variable} ${ethiopic.variable}`}>
     <body>{children}</body>
   </html>
 }
