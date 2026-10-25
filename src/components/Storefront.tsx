@@ -7,7 +7,7 @@ import {
   Monitor, PhoneCall, ShieldCheck, Smartphone, X,
 } from 'lucide-react'
 import { useStoreData } from '../context/StoreDataContext'
-import { formatPrice, formatStorage } from '../lib/format'
+import { formatPrice, formatStorage, fullPhoneName } from '../lib/format'
 import { createWhatsAppUrl, phoneOrderMessage } from '../lib/whatsapp'
 import type { Phone, SpecMode } from '../types'
 
@@ -153,13 +153,13 @@ export function KeySpecs({ phone, mode }: { phone: Phone; mode: SpecMode }) {
 export function PhoneCard({ phone, mode = 'simple', compact = false }: { phone: Phone; mode?: SpecMode; compact?: boolean }) {
   const { shop } = useStoreData()
   const orderMessage = phone.stock === 'out_of_stock'
-    ? `Hello ${shop.name}, please let me know when ${phone.brand} ${phone.model} is back in stock.`
-    : phoneOrderMessage(`${phone.brand} ${phone.model}`, formatStorage(phone.storageOptions[0]?.gb ?? 128), phone.colors[0]?.name ?? 'Any color', formatPrice(phone.price), `${shop.siteUrl}/phones/${phone.slug}`, shop.name)
+    ? `Hello ${shop.name}, please let me know when ${fullPhoneName(phone.brand, phone.model)} is back in stock.`
+    : phoneOrderMessage(`${fullPhoneName(phone.brand, phone.model)}`, formatStorage(phone.storageOptions[0]?.gb ?? 128), phone.colors[0]?.name ?? 'Any color', formatPrice(phone.price), `${shop.siteUrl}/phones/${phone.slug}`, shop.name)
   const order = createWhatsAppUrl(orderMessage, shop.whatsapp[0])
   return (
     <article className={`phone-card ${compact ? 'phone-card-compact' : ''}`}>
       <Link href={`/phones/${phone.slug}`} className="product-art-link">
-        <img className="product-art" src={phone.images[0]} alt={`${phone.brand} ${phone.model} phone`} loading="lazy" />
+        <img className="product-art" src={phone.images[0]} alt={`${fullPhoneName(phone.brand, phone.model)} phone`} loading="lazy" />
         <div className="product-card-badges">{phone.badges.slice(0, 1).map((badge) => <span className="pill" key={badge}>{badge}</span>)}</div>
         <span className="product-arrow"><ArrowUpRight size={17} /></span>
       </Link>

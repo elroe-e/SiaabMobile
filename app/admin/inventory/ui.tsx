@@ -1,6 +1,7 @@
 'use client'
 
 import { useSearchParams } from 'next/navigation'
+import { fullPhoneName } from '../../../src/lib/format'
 import { ArrowLeft, ArrowRight, Camera, CircleDollarSign, PackagePlus, Pencil, RefreshCw, Search, Smartphone, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
@@ -128,7 +129,7 @@ export function InventoryManager({ role }: { role: Role }) {
         </InventoryTable>}
         {(filter === 'all' || filter === 'upcoming') && <InventoryTable title="Upcoming models" count={visibleModels.length}>
           <thead><tr><th>Model</th><th>Expected date / price</th><th>Specifications</th><th>Visibility</th><th>Actions</th></tr></thead>
-          <tbody>{visibleModels.map((row) => <tr key={row.id}><td><strong>{brandName(row.brands)} {row.name}</strong><small>{row.slug}</small></td><td>{row.expected_date ?? 'Not set'}<small>{row.expected_price_range ?? 'Price to be announced'}</small></td><td><span className={`admin-badge ${row.specs_reviewed ? 'green' : 'amber'}`}>{row.specs_reviewed ? 'Reviewed' : 'Needs review'}</span></td><td><span className="admin-badge green">Upcoming</span></td><td><div className="admin-table-actions"><button className="admin-icon-button" title="Edit upcoming details and specifications" onClick={() => setEditing({ type: 'model', item: row })}><Pencil size={14} /></button><button className="admin-icon-button" title="Add model photos" onClick={() => setPhotoTarget({ id: row.id, kind: 'model', label: row.name })}><Camera size={14} /></button>{role === 'owner' && <button className="admin-icon-button danger" title="Delete model" onClick={() => void deleteItem(row.id, 'model', row.name)}><Trash2 size={14} /></button>}</div></td></tr>)}</tbody>
+          <tbody>{visibleModels.map((row) => <tr key={row.id}><td><strong>{fullPhoneName(brandName(row.brands), row.name)}</strong><small>{row.slug}</small></td><td>{row.expected_date ?? 'Not set'}<small>{row.expected_price_range ?? 'Price to be announced'}</small></td><td><span className={`admin-badge ${row.specs_reviewed ? 'green' : 'amber'}`}>{row.specs_reviewed ? 'Reviewed' : 'Needs review'}</span></td><td><span className="admin-badge green">Upcoming</span></td><td><div className="admin-table-actions"><button className="admin-icon-button" title="Edit upcoming details and specifications" onClick={() => setEditing({ type: 'model', item: row })}><Pencil size={14} /></button><button className="admin-icon-button" title="Add model photos" onClick={() => setPhotoTarget({ id: row.id, kind: 'model', label: row.name })}><Camera size={14} /></button>{role === 'owner' && <button className="admin-icon-button danger" title="Delete model" onClick={() => void deleteItem(row.id, 'model', row.name)}><Trash2 size={14} /></button>}</div></td></tr>)}</tbody>
         </InventoryTable>}
       </>}
     </div>

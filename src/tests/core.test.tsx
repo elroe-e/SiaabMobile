@@ -120,3 +120,13 @@ describe('catalog and WhatsApp helpers', () => {
     expect(screen.getByText('STEP 1 OF 3')).toBeInTheDocument()
   })
 })
+
+describe('phone display names', () => {
+  it('does not repeat the brand when the model already includes it', async () => {
+    const { fullPhoneName } = await import('../lib/format')
+    expect(fullPhoneName('Honor', 'Honor 400')).toBe('Honor 400')
+    expect(fullPhoneName('OnePlus', 'OnePlus 13')).toBe('OnePlus 13')
+    expect(fullPhoneName('Samsung', 'Galaxy S24 Ultra')).toBe('Samsung Galaxy S24 Ultra')
+    expect(fullPhoneName('Xiaomi', 'Redmi Note 13 Pro')).toBe('Xiaomi Redmi Note 13 Pro')
+  })
+})

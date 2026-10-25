@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { fullPhoneName } from '../../src/lib/format'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import App from '../../src/App'
@@ -17,10 +18,10 @@ export async function generateMetadata({ params }: { params: Promise<{ slug?: st
     try { catalog = await getPublicCatalog() } catch (error) { console.error('Could not load dynamic metadata from Supabase.', error) }
     const phone = catalog.find((item) => item.slug === slug[1])
     if (phone) return {
-      title: `${phone.brand} ${phone.model}`,
+      title: `${fullPhoneName(phone.brand, phone.model)}`,
       alternates,
       description: `${phone.tagline} Check stock, ETB price, colors, storage, warranty and specifications at Siaab Mobile.`,
-      openGraph: { title: `${phone.brand} ${phone.model} | Siaab Mobile`, description: phone.tagline, images: [phone.images[0] ?? '/og-image.svg'] },
+      openGraph: { title: `${fullPhoneName(phone.brand, phone.model)} | Siaab Mobile`, description: phone.tagline, images: [phone.images[0] ?? '/og-image.svg'] },
     }
   }
   const titles: Record<string, string> = {
