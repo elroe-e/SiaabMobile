@@ -110,3 +110,38 @@ All sample prices, stock, warranties, device details, trade-in values, upcoming 
 - Supabase Postgres, Auth and Storage, with RLS and server-side API validation.
 - Recharts, Lucide icons, Zod, Vitest and Testing Library.
 - Netlify as the documented free-tier Next.js host; provider plans and usage quotas are subject to change.
+
+## Adding a phone (admin)
+
+Admin → Inventory → **Add inventory** opens a two-step form.
+
+1. **Phone details:** type, brand, model, colour(s), RAM, storage, price, quantity and photos. For several colours write them with commas (for example `Black, Blue`); each colour gets its own stock line with the same quantity. Customers see the colours but cannot choose one. If the model already exists, the form adds the new colour or storage to it instead of creating a duplicate.
+2. **Specifications:** the app looks up the remaining specifications automatically (saved library, Wikipedia, then the optional Google AI source). Review the list, tick **These specifications look right** and the phone is published. Without that tick it is saved as a draft and stays hidden. If nothing is found you can paste specifications copied from any website, or save and customers see "Not specified".
+
+Photos chosen in step 1 are shrunk to WebP (under 200 KB) and uploaded as soon as the phone is saved. The first photo is the main one.
+
+### Free spec lookup for brand-new phones
+
+Wikipedia rarely has articles for phones released in the last year, so for new models the optional Google AI source does most of the work. It uses Google's free Gemini API:
+
+1. Create a free key at Google AI Studio (aistudio.google.com) with the shop's Google account.
+2. Add it to the host's environment variables as `GEMINI_API_KEY` (SmarterASP.NET: Node.js project → **Environment Variables**), then redeploy. Never put the key in the repository or in chat.
+3. Optional: `GEMINI_MODEL` overrides the model name (default `gemini-2.5-flash`). If lookups start failing with an HTTP 404, Google has retired that name; set a current one.
+
+Free-tier limits apply; when Google answers "busy", wait a minute or paste the specifications instead. AI-found specifications are suggestions: always check them before ticking the confirmation box.
+
+## Two-factor sign-in (optional)
+
+Admin → Settings → **Two-factor sign-in** → *Turn on two-factor*. Scan the QR code with Google Authenticator, Microsoft Authenticator or Authy and enter the 6-digit code. From then on sign-in asks for a code after the password. Each person turns it on for their own account.
+
+Lost the phone? In the Supabase dashboard open **Authentication → Users**, pick the account and delete its authenticator factor; the account then signs in with just the password again.
+
+## Languages
+
+The storefront has an English / አማርኛ switch in the header (remembered in a cookie). Translations live in [`src/i18n/am.ts`](./src/i18n/am.ts): the key is the exact English text and any text without an entry stays in English. Product names, specifications and the admin panel are not translated. Have a native Amharic speaker review the wording before launch. A test fails if new storefront text is added without an Amharic entry.
+
+## Other small settings
+
+- Lines under the price on phone pages: [`src/data/assurances.ts`](./src/data/assurances.ts). Change them to match the shop's real policy.
+- Backup reminder: the admin overview and settings show how long ago this browser last downloaded **Export everything**.
+- Share button on phone pages uses the phone's share sheet where available, with WhatsApp, Telegram and copy-link as fallbacks.

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireAdmin } from '../../../../src/lib/supabase/auth'
+import { colorHex, splitColors } from '../../../../src/lib/colors'
 
 const commonSchema = z.object({
   brand: z.string().trim().min(1).max(80),
@@ -75,23 +76,43 @@ export async function POST(request: Request) {
   const input = parsed.data
   if (input.kind === 'new' && !input.variant) return NextResponse.json({ error: 'Enter a new-phone variant.' }, { status: 400 })
   if (input.kind === 'used' && !input.unit) return NextResponse.json({ error: 'Enter used-unit details.' }, { status: 400 })
-  if (input.isPublished && !input.specsReviewed) return NextResponse.json({ error: 'Confirm model specifications before publishing.' }, { status: 400 })
   if (input.status === 'upcoming' && !input.expectedDate) return NextResponse.json({ error: 'Add an expected date for an upcoming model.' }, { status: 400 })
+  const colors = input.kind === 'new' && input.variant ? splitColors(input.variant.colorName) : []
+  if (input.kind === 'new' && colors.length === 0) return NextResponse.json({ error: 'Enter at least one colour.' }, { status: 400 })
   try {
     const { supabase, profile } = await requireAdmin()
     if (input.kind === 'used' && profile.role !== 'owner' && (input.unit?.costPrice !== undefined || input.unit?.imei || input.unit?.notesInternal)) {
       return NextResponse.json({ error: 'Only the owner can set cost price, IMEI or internal notes.' }, { status: 403 })
     }
+    const variantRows = (modelId: string, names: string[], published: boolean) => names.map((name) => ({
+      model_id: modelId, ram_gb: input.variant!.ramGb, storage_gb: input.variant!.storageGb, color_name: name, color_hex: colorHex(name),
+      price: input.variant!.price, old_price: input.variant!.oldPrice ?? null, stock_count: input.variant!.stockCount,
+      low_stock_threshold: input.variant!.lowStockThreshold, is_published: published,
+    }))
+
+    // Adding another colour or storage to a phone that already exists only needs new variants.
+    if (input.kind === 'new') {
+      const { data: existing, error: lookupError } = await supabase.from('phone_models').select('id,specs_reviewed').eq('slug', input.slug).maybeSingle()
+      if (lookupError) return NextResponse.json({ error: lookupError.message }, { status: 500 })
+      if (existing) {
+        if (input.isPublished && !existing.specs_reviewed) return NextResponse.json({ error: 'Confirm model specifications before publishing.' }, { status: 400 })
+        const { error: insertError } = await supabase.from('variants').insert(variantRows(existing.id, colors, input.isPublished))
+        if (insertError) return NextResponse.json({ error: insertError.message.includes('duplicate') ? 'That colour, RAM and storage combination already exists for this phone.' : insertError.message }, { status: 400 })
+        return NextResponse.json({ modelId: existing.id, existingModel: true }, { status: 201 })
+      }
+    }
+    if (input.isPublished && !input.specsReviewed) return NextResponse.json({ error: 'Confirm model specifications before publishing.' }, { status: 400 })
+
     const { data: id, error } = await supabase.rpc('create_inventory', {
       p_model: {
-        brand: input.brand, name: input.model, slug: input.slug, tagline: input.tagline,
+        brand: input.brand, name: input.model, slug: input.slug, tagline: '',
         status: input.status, expectedDate: input.expectedDate ?? null, expectedPriceRange: input.expectedPriceRange ?? null,
         specs: input.specs, specMeta: input.specMeta, specsReviewed: input.specsReviewed,
         published: input.isPublished,
       },
       p_kind: input.kind,
       p_variant: input.variant ? {
-        ...input.variant, oldPrice: input.variant.oldPrice ?? null,
+        ...input.variant, colorName: colors[0] ?? input.variant.colorName, colorHex: colorHex(colors[0] ?? input.variant.colorName), oldPrice: input.variant.oldPrice ?? null,
       } : null,
       p_unit: input.unit ? {
         ...input.unit, batteryHealthPct: input.unit.batteryHealthPct ?? null,
@@ -99,7 +120,12 @@ export async function POST(request: Request) {
       } : null,
     })
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-    return NextResponse.json(typeof id === 'object' && id !== null ? id : { modelId: id }, { status: 201 })
+    const created = (typeof id === 'object' && id !== null ? id : { modelId: id }) as { modelId?: string }
+    if (input.kind === 'new' && colors.length > 1 && created.modelId) {
+      const { error: extraError } = await supabase.from('variants').insert(variantRows(created.modelId, colors.slice(1), input.isPublished))
+      if (extraError) return NextResponse.json({ error: `The phone was created, but the extra colours could not be added: ${extraError.message}` }, { status: 500 })
+    }
+    return NextResponse.json(created, { status: 201 })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Could not save inventory.'
     return NextResponse.json({ error: message }, { status: message.includes('Authentication') || message.includes('permission') ? 403 : 500 })

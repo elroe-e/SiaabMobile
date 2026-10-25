@@ -3,7 +3,7 @@ import type { SpecProvider } from './types'
 
 const lastRequest = { at: 0 }
 
-const squash = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, '')
+const squash = (value: string) => value.toLowerCase().replace(/\+/g, 'plus').replace(/[^a-z0-9]+/g, '')
 
 /** Accept an article only when its title is exactly this phone, so "OnePlus 13" never matches "OnePlus 7". */
 export function titleMatchesModel(brand: string, model: string, title: string): boolean {

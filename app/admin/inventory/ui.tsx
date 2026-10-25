@@ -2,6 +2,8 @@
 
 import { useSearchParams } from 'next/navigation'
 import { fullPhoneName } from '../../../src/lib/format'
+import { preparePhoto } from './photo-tools'
+import { CreateInventoryModal } from './create-modal'
 import { ArrowLeft, ArrowRight, Camera, CircleDollarSign, PackagePlus, Pencil, RefreshCw, Search, Smartphone, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
@@ -11,7 +13,6 @@ type ModelRow = { id: string; name: string; slug: string; status: string; expect
 type VariantRow = { id: string; model_id: string; ram_gb: number; storage_gb: number; color_name: string; price: number; stock_count: number; low_stock_threshold: number; is_published: boolean; phone_models: RelatedModel | RelatedModel[] | null }
 type UsedRow = { id: string; model_id: string; ram_gb: number; storage_gb: number; color_name: string; grade: string; battery_health_pct: number | null; accessories: string; warranty_months: number; price: number; cost_price?: number | null; imei?: string | null; notes_internal?: string; status: string; is_published: boolean; reserved_until: string | null; sold_at: string | null; phone_models: RelatedModel | RelatedModel[] | null }
 type Data = { models: ModelRow[]; variants: VariantRow[]; used: UsedRow[] }
-type Kind = 'new' | 'used' | 'upcoming'
 type Photo = { id: string; path: string; alt_text: string; sort_order: number; is_main: boolean; url: string }
 const emptyData: Data = { models: [], variants: [], used: [] }
 const money = (value: number) => new Intl.NumberFormat('en-ET', { style: 'currency', currency: 'ETB', maximumFractionDigits: 0 }).format(Number(value))
@@ -83,9 +84,6 @@ export function InventoryManager({ role }: { role: Role }) {
     const response = await fetch('/api/admin/inventory', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
     const result = await response.json()
     if (!response.ok) throw new Error(result.error ?? 'Could not create inventory.')
-    setNotice('Inventory item created.')
-    setAdding(false)
-    await refresh()
     return result
   }
 
@@ -133,7 +131,7 @@ export function InventoryManager({ role }: { role: Role }) {
         </InventoryTable>}
       </>}
     </div>
-    {adding && <CreateInventoryModal role={role} onClose={() => setAdding(false)} onCreate={create} />}
+    {adding && <CreateInventoryModal role={role} onClose={() => setAdding(false)} onCreate={create} onFinished={(message) => { setAdding(false); setNotice(message); void refresh() }} />}
     {editing && <UpdateInventoryModal role={role} target={editing} onClose={() => setEditing(null)} onSave={update} />}
     {photoTarget && <PhotoModal target={photoTarget} onClose={() => setPhotoTarget(null)} />}
     <p className="admin-inline-note" style={{ marginTop: 10 }}>For a new sale or reservation, choose the matching action. Every sale is recorded transactionally; undo restores stock.</p>
@@ -142,105 +140,6 @@ export function InventoryManager({ role }: { role: Role }) {
 
 function InventoryTable({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
   return <section className="admin-inventory-table-section"><div className="admin-card-title"><h3>{title}</h3><span>{count} records</span></div>{count === 0 ? <div className="admin-empty">No matching inventory yet.</div> : <><div className="admin-table-wrap"><table className="admin-table">{children}</table></div><div className="admin-mobile-card-list">{/* Rows remain available in the scrollable table on larger screens. */}</div></>}</section>
-}
-
-function CreateInventoryModal({ role, onClose, onCreate }: { role: Role; onClose: () => void; onCreate: (body: Record<string, unknown>) => Promise<unknown> }) {
-  const [kind, setKind] = useState<Kind>('new')
-  const [brand, setBrand] = useState('')
-  const [model, setModel] = useState('')
-  const [slug, setSlug] = useState('')
-  const [tagline, setTagline] = useState('')
-  const [expectedDate, setExpectedDate] = useState('')
-  const [expectedPriceRange, setExpectedPriceRange] = useState('')
-  const [pastedText, setPastedText] = useState('')
-  const [specsText, setSpecsText] = useState('{}')
-  const [specMeta, setSpecMeta] = useState<Record<string, unknown>>({})
-  const [reviewed, setReviewed] = useState(false)
-  const [published, setPublished] = useState(false)
-  const [variant, setVariant] = useState({ ramGb: '8', storageGb: '128', colorName: '', colorHex: '#777777', price: '', oldPrice: '', stockCount: '1', lowStockThreshold: '2' })
-  const [unit, setUnit] = useState({ ramGb: '8', storageGb: '128', colorName: '', grade: 'A', batteryHealthPct: '90', accessories: 'Phone only', warrantyMonths: '0', price: '', costPrice: '', imei: '', notesInternal: '' })
-  const [busy, setBusy] = useState(false)
-  const [lookupBusy, setLookupBusy] = useState(false)
-  const [error, setError] = useState('')
-  const [providerInfo, setProviderInfo] = useState('')
-
-  useEffect(() => {
-    setSlug(`${brand}-${model}`.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''))
-  }, [brand, model])
-
-  const lookupSpecs = async () => {
-    if (!brand.trim() || !model.trim()) { setError('Enter the brand and model before looking up specifications.'); return }
-    setLookupBusy(true); setError(''); setProviderInfo('')
-    const response = await fetch('/api/admin/specs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ brand, model, ...(pastedText.trim() ? { pastedText } : {}) }) })
-    const result = await response.json()
-    setLookupBusy(false)
-    if (!response.ok) { setError(result.error ?? 'Specification lookup failed.'); return }
-    setSpecsText(JSON.stringify(result.specs ?? {}, null, 2))
-    setSpecMeta(result.metadata ?? {})
-    setProviderInfo((result.providers ?? []).map((provider: { name: string; status: string; foundFields: number }) => `${provider.name}: ${provider.status} (${provider.foundFields})`).join(' · '))
-  }
-
-  const save = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); setBusy(true); setError('')
-    let specs: Record<string, unknown>
-    try { specs = JSON.parse(specsText) as Record<string, unknown> } catch { setBusy(false); setError('Specifications must be valid JSON.'); return }
-    const body = {
-      kind, brand: brand.trim(), model: model.trim(), slug, tagline,
-      status: kind === 'upcoming' ? 'upcoming' : 'available',
-      ...(kind === 'upcoming' ? { expectedDate, expectedPriceRange } : {}),
-      specs, specMeta, specsReviewed: reviewed, isPublished: published,
-      ...(kind === 'new' ? { variant: { ...variant, ramGb: Number(variant.ramGb), storageGb: Number(variant.storageGb), price: Number(variant.price), ...(variant.oldPrice ? { oldPrice: Number(variant.oldPrice) } : {}), stockCount: Number(variant.stockCount), lowStockThreshold: Number(variant.lowStockThreshold) } } : {}),
-      ...(kind === 'used' ? { unit: { ...unit, ramGb: Number(unit.ramGb), storageGb: Number(unit.storageGb), batteryHealthPct: Number(unit.batteryHealthPct), warrantyMonths: Number(unit.warrantyMonths), price: Number(unit.price), ...(unit.costPrice ? { costPrice: Number(unit.costPrice) } : {}) } } : {}),
-    }
-    try { await onCreate(body) } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not create inventory.'); setBusy(false) }
-  }
-
-  return <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
-    <section className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="create-inventory-title">
-      <header className="admin-modal-header"><div><h2 id="create-inventory-title">Add inventory</h2><p>Model details, verified specifications and a first stock item.</p></div><button className="admin-icon-button" type="button" onClick={onClose} aria-label="Close">×</button></header>
-      <div className="admin-step-row">{['1 · Model', '2 · Specifications', ...(kind === 'upcoming' ? [] : ['3 · Stock'])].map((label, index) => <span key={label} className={`admin-step-chip ${index === 0 ? 'active' : ''}`}>{label}</span>)}</div>
-      <form onSubmit={save}>
-        <div className="admin-form-grid">
-          <label className="admin-label full">Inventory type<select value={kind} onChange={(event) => setKind(event.target.value as Kind)}><option value="new">New phone + first variant</option><option value="used">Used phone · individual unit</option><option value="upcoming">Upcoming model</option></select></label>
-          <label className="admin-label">Brand<input required maxLength={80} value={brand} onChange={(event) => setBrand(event.target.value)} placeholder="Apple" /></label>
-          <label className="admin-label">Model<input required maxLength={120} value={model} onChange={(event) => setModel(event.target.value)} placeholder="iPhone 16" /></label>
-          <label className="admin-label full">URL slug<input required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" value={slug} onChange={(event) => setSlug(event.target.value)} /><small className="admin-inline-note">Keep this unique; existing store pages depend on the slug.</small></label>
-          <label className="admin-label full">Short description<input maxLength={240} value={tagline} onChange={(event) => setTagline(event.target.value)} placeholder="A brief line shown in the catalog" /></label>
-          {kind === 'upcoming' && <><label className="admin-label">Expected date / timing<input required value={expectedDate} onChange={(event) => setExpectedDate(event.target.value)} placeholder="Expected Q4 2026" /></label><label className="admin-label">Expected price range<input value={expectedPriceRange} onChange={(event) => setExpectedPriceRange(event.target.value)} placeholder="To be announced" /></label></>}
-          <div className="admin-label full"><span>Specifications</span><div className="admin-toolbar-left"><button type="button" className="button button-outline button-small" disabled={lookupBusy} onClick={() => void lookupSpecs()}>{lookupBusy ? 'Looking up…' : 'Fetch suggestions'}</button></div><textarea value={pastedText} onChange={(event) => setPastedText(event.target.value)} placeholder="Paste manufacturer specifications or product copy here (optional)" /></div>
-          <label className="admin-label full">Review and edit normalized specification JSON<textarea value={specsText} onChange={(event) => setSpecsText(event.target.value)} spellCheck={false} /></label>
-          {providerInfo && <p className="admin-inline-note full">{providerInfo}</p>}
-          {kind === 'new' && <>
-            <label className="admin-label">RAM (GB)<input type="number" min="1" max="24" required value={variant.ramGb} onChange={(event) => setVariant({ ...variant, ramGb: event.target.value })} /></label>
-            <label className="admin-label">Storage (GB)<input type="number" min="1" max="2048" required value={variant.storageGb} onChange={(event) => setVariant({ ...variant, storageGb: event.target.value })} /></label>
-            <label className="admin-label">Color<input required value={variant.colorName} onChange={(event) => setVariant({ ...variant, colorName: event.target.value })} /></label>
-            <label className="admin-label">Price (ETB)<input type="number" min="1" step="0.01" required value={variant.price} onChange={(event) => setVariant({ ...variant, price: event.target.value })} /></label>
-            <label className="admin-label">Previous price (ETB)<input type="number" min="1" step="0.01" value={variant.oldPrice} onChange={(event) => setVariant({ ...variant, oldPrice: event.target.value })} /></label>
-            <label className="admin-label">Quantity in stock<input type="number" min="0" required value={variant.stockCount} onChange={(event) => setVariant({ ...variant, stockCount: event.target.value })} /></label>
-          </>}
-          {kind === 'used' && <>
-            <label className="admin-label">RAM (GB)<input type="number" min="1" max="24" required value={unit.ramGb} onChange={(event) => setUnit({ ...unit, ramGb: event.target.value })} /></label>
-            <label className="admin-label">Storage (GB)<input type="number" min="1" max="2048" required value={unit.storageGb} onChange={(event) => setUnit({ ...unit, storageGb: event.target.value })} /></label>
-            <label className="admin-label">Color<input required value={unit.colorName} onChange={(event) => setUnit({ ...unit, colorName: event.target.value })} /></label>
-            <label className="admin-label">Grade<select value={unit.grade} onChange={(event) => setUnit({ ...unit, grade: event.target.value })}><option value="A">A · excellent</option><option value="B">B · good</option><option value="C">C · fair</option></select></label>
-            <label className="admin-label">Battery health (%)<input type="number" min="1" max="100" value={unit.batteryHealthPct} onChange={(event) => setUnit({ ...unit, batteryHealthPct: event.target.value })} /></label>
-            <label className="admin-label">Price (ETB)<input type="number" min="1" step="0.01" required value={unit.price} onChange={(event) => setUnit({ ...unit, price: event.target.value })} /></label>
-            <label className="admin-label">Accessories<input value={unit.accessories} onChange={(event) => setUnit({ ...unit, accessories: event.target.value })} /></label>
-            <label className="admin-label">Warranty (months)<input type="number" min="0" max="120" value={unit.warrantyMonths} onChange={(event) => setUnit({ ...unit, warrantyMonths: event.target.value })} /></label>
-            {role === 'owner' && <>
-              <label className="admin-label">Cost price<input type="number" min="0" step="0.01" value={unit.costPrice} onChange={(event) => setUnit({ ...unit, costPrice: event.target.value })} /></label>
-              <label className="admin-label">IMEI<input inputMode="numeric" pattern="[0-9]{14,16}" value={unit.imei} onChange={(event) => setUnit({ ...unit, imei: event.target.value })} /></label>
-              <label className="admin-label full">Internal notes<input value={unit.notesInternal} onChange={(event) => setUnit({ ...unit, notesInternal: event.target.value })} /></label>
-            </>}
-          </>}
-          <label className="admin-check full"><input type="checkbox" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} /> I have reviewed these specifications and confirmed they are suitable to publish.</label>
-          <label className="admin-check full"><input type="checkbox" checked={published} onChange={(event) => setPublished(event.target.checked)} /> Publish this model and its stock on the storefront.</label>
-        </div>
-        {error && <div className="admin-error" role="alert">{error}</div>}
-        <div className="admin-form-actions"><button className="button button-outline button-small" type="button" onClick={onClose}>Cancel</button><button className="button button-primary button-small" type="submit" disabled={busy}>{busy ? 'Saving…' : 'Create inventory'}</button></div>
-      </form>
-    </section>
-  </div>
 }
 
 function UpdateInventoryModal({ role, target, onClose, onSave }: {
@@ -260,7 +159,6 @@ function UpdateInventoryModal({ role, target, onClose, onSave }: {
   const [costPrice, setCostPrice] = useState(String(unit?.cost_price ?? ''))
   const [imei, setImei] = useState(unit?.imei ?? '')
   const [notes, setNotes] = useState(unit?.notes_internal ?? '')
-  const [tagline, setTagline] = useState(model?.tagline ?? '')
   const [expectedDate, setExpectedDate] = useState(model?.expected_date ?? '')
   const [expectedPriceRange, setExpectedPriceRange] = useState(model?.expected_price_range ?? '')
   const [specs, setSpecs] = useState(JSON.stringify(model?.specs ?? {}, null, 2))
@@ -275,7 +173,7 @@ function UpdateInventoryModal({ role, target, onClose, onSave }: {
     if (variant) body = { type: 'variant', id: variant.id, stockCount: Number(stockCount), price: Number(price), lowStockThreshold: Number(threshold), isPublished: published }
     else if (unit) body = { type: 'unit', id: unit.id, price: Number(price), isPublished: published, ...(role === 'owner' ? { costPrice: costPrice ? Number(costPrice) : null, imei: imei || null, notesInternal: notes } : {}) }
     else if (model) {
-      try { body = { type: 'model', id: model.id, tagline, expectedDate, expectedPriceRange, specs: JSON.parse(specs), specMeta: model.spec_meta, specsReviewed: reviewed } }
+      try { body = { type: 'model', id: model.id, expectedDate, expectedPriceRange, specs: JSON.parse(specs), specMeta: model.spec_meta, specsReviewed: reviewed } }
       catch { setBusy(false); setError('Specifications must be valid JSON.'); return }
     } else { setBusy(false); return }
     try { await onSave(body) } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save changes.'); setBusy(false) }
@@ -303,7 +201,6 @@ function UpdateInventoryModal({ role, target, onClose, onSave }: {
             </>}
           </>}
           {model && <>
-            <label className="admin-label full">Short description<input maxLength={240} value={tagline} onChange={(event) => setTagline(event.target.value)} /></label>
             <label className="admin-label">Expected date<input value={expectedDate} onChange={(event) => setExpectedDate(event.target.value)} /></label>
             <label className="admin-label">Expected price range<input value={expectedPriceRange} onChange={(event) => setExpectedPriceRange(event.target.value)} /></label>
             <label className="admin-label full">Specifications<textarea value={specs} onChange={(event) => setSpecs(event.target.value)} spellCheck={false} /></label>
@@ -332,35 +229,16 @@ function PhotoModal({ target, onClose }: { target: { id: string; kind: 'model' |
   }, [target])
   useEffect(() => { void load() }, [load])
 
-  const compress = (file: File) => new Promise<Blob>((resolve, reject) => {
-    const image = new Image()
-    const source = URL.createObjectURL(file)
-    image.onload = () => {
-      const scale = Math.min(1, 1600 / Math.max(image.width, image.height))
-      const canvas = document.createElement('canvas')
-      canvas.width = Math.round(image.width * scale)
-      canvas.height = Math.round(image.height * scale)
-      const context = canvas.getContext('2d')
-      if (!context) { URL.revokeObjectURL(source); reject(new Error('Image compression is unavailable in this browser.')); return }
-      context.drawImage(image, 0, 0, canvas.width, canvas.height)
-      URL.revokeObjectURL(source)
-      canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Could not compress this image.')), 'image/webp', .82)
-    }
-    image.onerror = () => { URL.revokeObjectURL(source); reject(new Error('Could not read this image.')) }
-    image.src = source
-  })
-
   const upload = async (files: FileList | null) => {
     if (!files?.length) return
     setBusy(true); setError('')
     try {
       for (const file of Array.from(files)) {
-        if (!file.type.startsWith('image/')) throw new Error(`${file.name} is not an image.`)
-        const blob = await compress(file)
-        if (blob.size > 200 * 1024) throw new Error(`${file.name} is larger than 200 KB after compression. Choose a smaller image.`)
+        const dataUrl = await preparePhoto(file)
+
         const response = await fetch('/api/admin/photos', {
           method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ kind: target.kind, entityId: target.id, dataUrl: await toDataUrl(blob), altText: target.label }),
+          body: JSON.stringify({ kind: target.kind, entityId: target.id, dataUrl, altText: target.label }),
         })
         const result = await response.json()
         if (!response.ok) throw new Error(result.error ?? 'Photo upload failed.')
@@ -404,11 +282,3 @@ function PhotoModal({ target, onClose }: { target: { id: string; kind: 'model' |
   </div>
 }
 
-function toDataUrl(blob: Blob) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Could not encode the compressed image.'))
-    reader.onerror = () => reject(new Error('Could not read the compressed image.'))
-    reader.readAsDataURL(blob)
-  })
-}

@@ -24,3 +24,17 @@ describe('wiki markup cleanup', () => {
     expect(cleaned).not.toMatch(/\[\[|'''|<br/)
   })
 })
+
+describe('plus naming and AI reply parsing', () => {
+  it('treats "Pro+" and "Pro Plus" as the same phone', () => {
+    expect(titleMatchesModel('Redmi', 'Redmi Note 14 Pro Plus', 'Redmi Note 14 Pro+')).toBe(true)
+    expect(titleMatchesModel('Samsung', 'Galaxy S24+', 'Samsung Galaxy S24 Plus')).toBe(true)
+    expect(titleMatchesModel('Samsung', 'Galaxy S24', 'Samsung Galaxy S24+')).toBe(false)
+  })
+
+  it('extracts the JSON object from fenced or chatty AI replies', async () => {
+    const { extractJson } = await import('../lib/specs/gemini-provider')
+    expect(JSON.parse(extractJson('```json\n{"chipset":"A17"}\n```'))).toEqual({ chipset: 'A17' })
+    expect(JSON.parse(extractJson('Here you go: {"batteryMah": 5000} Hope that helps'))).toEqual({ batteryMah: 5000 })
+  })
+})

@@ -11,3 +11,11 @@
 - Owner exports contain personal data and confidential information, including leads, audit records, used-unit costs and IMEIs. Store exports encrypted, limit access and follow applicable privacy/retention requirements.
 - Free hosting/database tiers have quotas, pausing behavior and terms that can change. Review current provider terms, usage and commercial eligibility before launch; free-tier availability is not a guarantee of uninterrupted service.
 - The production origin defaults to `https://siaabmobile.com`. Update `NEXT_PUBLIC_SITE_URL`, Supabase Auth's allowed URLs, Netlify environment settings and the GitHub Actions `SITE_URL` variable for the actual domain.
+- Phone pages show two short promises under the price ("Pay in store", "Check the phone in person before you buy"). They are assumptions about shop policy; edit `src/data/assurances.ts`.
+- Amharic wording was written without a native review and must be checked before launch. Product names, specifications and the admin panel stay in English.
+- Adding a phone still needs a price and a quantity in addition to brand, model, colour, RAM and storage, because the storefront cannot list or sell a phone without them.
+- Colours are display-only for customers. The swatch dot on the storefront is guessed from the colour name the owner types.
+- Each phone model shows as one card on the shop. Its price is the lowest variant price and its stock count is the total across colours and storage options.
+- Automatic spec lookup can only be as good as its free sources. Wikipedia and the saved library cover older phones; recent phones need the optional `GEMINI_API_KEY` or pasted specifications. Specifications are never published until the owner ticks the confirmation.
+- The backup reminder is stored per browser (localStorage); it cannot know about backups taken on another device.
+- Two-factor sign-in uses Supabase Auth TOTP and is off until a person enables it. If Supabase cannot report the sign-in assurance level, the check lets the sign-in through rather than locking the owner out.

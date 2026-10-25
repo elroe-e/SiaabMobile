@@ -1,4 +1,6 @@
 import { Suspense } from 'react'
+import { cookies } from 'next/headers'
+import { LANGUAGE_COOKIE, parseLanguage } from '../../src/i18n/language'
 import { fullPhoneName } from '../../src/lib/format'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
@@ -20,8 +22,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug?: st
     if (phone) return {
       title: `${fullPhoneName(phone.brand, phone.model)}`,
       alternates,
-      description: `${phone.tagline} Check stock, ETB price, colors, storage, warranty and specifications at Siaab Mobile.`,
-      openGraph: { title: `${fullPhoneName(phone.brand, phone.model)} | Siaab Mobile`, description: phone.tagline, images: [phone.images[0] ?? '/og-image.svg'] },
+      description: `${fullPhoneName(phone.brand, phone.model)}: stock, ETB price, storage options, warranty and full specifications at Siaab Mobile.`,
+      openGraph: { title: `${fullPhoneName(phone.brand, phone.model)} | Siaab Mobile`, description: `${fullPhoneName(phone.brand, phone.model)} at Siaab Mobile.`, images: [phone.images[0] ?? '/og-image.svg'] },
     }
   }
   const titles: Record<string, string> = {
@@ -43,6 +45,7 @@ const knownPages = new Set(['', 'phones', 'upcoming', 'trade-in', 'about', 'cont
 
 export default async function StorefrontPage({ params }: { params: Promise<{ slug?: string[] }> }) {
   const { slug = [] } = await params
+  const initialLang = parseLanguage((await cookies()).get(LANGUAGE_COOKIE)?.value)
   let catalog = phones
   let storeData: StoreData | null = null
   try {
@@ -53,5 +56,5 @@ export default async function StorefrontPage({ params }: { params: Promise<{ slu
   const path = slug.join('/')
   const isPhonePage = slug[0] === 'phones' && slug.length === 2 && catalog.some((item) => item.slug === slug[1])
   if (!knownPages.has(path) && !isPhonePage) notFound()
-  return <Suspense fallback={<LoadingStorefront />}><App initialPhones={catalog} {...(storeData ? { initialStoreData: storeData } : {})} /></Suspense>
+  return <Suspense fallback={<LoadingStorefront />}><App initialPhones={catalog} initialLang={initialLang} {...(storeData ? { initialStoreData: storeData } : {})} /></Suspense>
 }

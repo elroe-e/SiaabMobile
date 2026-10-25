@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { needsSecondStep } from './src/lib/supabase/mfa'
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -27,6 +28,14 @@ export async function middleware(request: NextRequest) {
   })
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return NextResponse.redirect(login)
+  // Accounts that turned on two-factor must finish the code step before reaching the admin.
+  const { data: assurance } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+  if (needsSecondStep(assurance)) {
+    login.searchParams.set('mfa', '1')
+    const redirect = NextResponse.redirect(login)
+    response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie))
+    return redirect
+  }
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('role')
