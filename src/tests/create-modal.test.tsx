@@ -45,7 +45,7 @@ describe('Add phone form', () => {
 
   it('saves as a draft until the specifications are confirmed', async () => {
     const user = userEvent.setup()
-    const onCreate = vi.fn(async () => ({ modelId: 'm1' }))
+    const onCreate = vi.fn(async (_body: Record<string, unknown>) => ({ modelId: 'm1' }))
     const onFinished = vi.fn()
     render(<CreateInventoryModal role="owner" onClose={() => undefined} onCreate={onCreate} onFinished={onFinished} />)
     await fillBasics(user)
@@ -53,7 +53,7 @@ describe('Add phone form', () => {
     await screen.findByText('Snapdragon 8 Elite')
     await user.click(screen.getByRole('button', { name: 'Save phone' }))
     await waitFor(() => expect(onCreate).toHaveBeenCalled())
-    const body = onCreate.mock.calls[0]![0] as Record<string, unknown>
+    const body = onCreate.mock.calls[0]![0]
     expect(body).toMatchObject({ kind: 'new', slug: 'samsung-galaxy-s25', specsReviewed: false, isPublished: false })
     expect(body.variant).toMatchObject({ colorName: 'Black, Blue', ramGb: 12, storageGb: 256, price: 99000 })
     expect(body).not.toHaveProperty('tagline')
@@ -63,7 +63,7 @@ describe('Add phone form', () => {
   it('publishes once confirmed and uploads the chosen photos to the new phone', async () => {
     const user = userEvent.setup()
     const { uploadPhoto } = await import('../../app/admin/inventory/photo-tools')
-    const onCreate = vi.fn(async () => ({ modelId: 'model-123' }))
+    const onCreate = vi.fn(async (_body: Record<string, unknown>) => ({ modelId: 'model-123' }))
     const onFinished = vi.fn()
     render(<CreateInventoryModal role="owner" onClose={() => undefined} onCreate={onCreate} onFinished={onFinished} />)
     await fillBasics(user)
