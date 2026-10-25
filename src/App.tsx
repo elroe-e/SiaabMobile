@@ -19,7 +19,7 @@ import { useSpecMode } from './hooks/useSpecMode'
 import { useDebounce } from './hooks/useDebounce'
 import type { TradeInAnswers, TradeInEstimate, UpcomingPhone } from './types'
 import type { Phone } from './types'
-import { AdvancedSpecs, FloatingWhatsApp, Footer, Header, KeySpecs, PhoneCard, SectionHeading, SpecSwitcher, StockBadge, TrustStrip } from './components/Storefront'
+import { AdvancedSpecs, FloatingWhatsApp, Footer, Header, ShareButton, KeySpecs, PhoneCard, SectionHeading, SpecSwitcher, StockBadge, TrustStrip } from './components/Storefront'
 import { defaultStoreData, StoreDataProvider, useStoreData, type StoreData } from './context/StoreDataContext'
 
 const PhoneContext = createContext<Phone[]>(phones)
@@ -231,7 +231,7 @@ function PhoneDetail() {
         {visibleColors(phone.colors).length > 0 && <div className="detail-option"><div className="option-heading"><strong>Available colors</strong></div><ul className="color-list">{visibleColors(phone.colors).map((item) => <li key={item.name}><span className="color-dot" style={{ '--swatch': item.hex } as CSSProperties} aria-hidden="true" />{item.name}</li>)}</ul></div>}
         <div className="detail-option"><div className="option-heading"><strong>Storage</strong><span>Choose capacity</span></div><div className="storage-options">{phone.storageOptions.map((option) => <button key={option.gb} className={`storage-option ${storage === option.gb ? 'selected' : ''}`} type="button" onClick={() => setStorage(option.gb)} aria-pressed={storage === option.gb}><span>{formatStorage(option.gb)}</span><strong>{formatPrice(option.price)}</strong></button>)}</div></div>
         <div className="detail-warranty"><ShieldCheck size={18} /><span><strong>{phone.warrantyMonths}-month warranty</strong><small>Included with your purchase</small></span><Check size={16} /></div>
-        <div className="detail-actions"><a href={orderUrl} target="_blank" rel="noreferrer" className={`button button-whatsapp button-large ${phone.stock === 'out_of_stock' ? 'button-disabled' : ''}`}><MessageCircle size={18} />{phone.stock === 'out_of_stock' ? 'Ask when it’s back' : 'Order on WhatsApp'}</a><a href={`tel:${shop.phones[0]}`} className="button button-outline button-large"><PhoneCall size={17} />Call the shop</a></div>
+        <div className="detail-actions"><a href={orderUrl} target="_blank" rel="noreferrer" className={`button button-whatsapp button-large ${phone.stock === 'out_of_stock' ? 'button-disabled' : ''}`}><MessageCircle size={18} />{phone.stock === 'out_of_stock' ? 'Ask when it’s back' : 'Order on WhatsApp'}</a><a href={`tel:${shop.phones[0]}`} className="button button-outline button-large"><PhoneCall size={17} />Call the shop</a><ShareButton title={fullPhoneName(phone.brand, phone.model)} url={`${shop.siteUrl}${pathname}`} /></div>
         <Link className="detail-trade-link" href={`/trade-in?target=${phone.slug}`}><Smartphone size={17} />Trade in your old phone toward this one <ArrowRight size={16} /></Link>
         <p className="detail-small-note"><ShieldCheck size={14} /> No online payment. Confirm availability with our team.</p>
       </div></div>

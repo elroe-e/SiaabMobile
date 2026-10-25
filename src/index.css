@@ -830,3 +830,8 @@ p { color: var(--muted); line-height: 1.72; }
 @media (hover: hover) and (pointer: fine) { .floating-wa:hover { background: #0e7153; transform: translateY(-2px); } }
 @media (max-width: 900px) { .floating-wa-product { display: none; } }
 @media (prefers-reduced-motion: reduce) { .floating-wa:hover, .floating-wa:active { transform: none; } }
+.share-wrap { position: relative; }
+.share-menu { position: absolute; z-index: 20; top: calc(100% + 8px); left: 0; min-width: 190px; display: grid; padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--white); box-shadow: var(--shadow); transform-origin: top left; animation: fade-in .14s var(--ease-out); }
+.share-menu a, .share-menu button { padding: 11px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font-size: 14px; font-weight: 600; text-align: left; cursor: pointer; }
+@media (hover: hover) and (pointer: fine) { .share-menu a:hover, .share-menu button:hover { background: var(--blue-pale); } }
+.detail-actions .share-wrap { grid-column: 1 / -1; } .detail-actions .share-wrap > .button { width: 100%; }

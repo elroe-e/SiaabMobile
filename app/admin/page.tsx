@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { ArrowRight, BadgeDollarSign, Boxes, ClipboardList, Smartphone, TriangleAlert } from 'lucide-react'
 import { AdminShell } from './admin-shell'
 import { SalesTrend } from './sales-trend'
+import { BackupLink, BackupStatus } from './backup-status'
 import { requireAdmin } from '../../src/lib/supabase/auth'
 
 export const dynamic = 'force-dynamic'
@@ -67,7 +68,7 @@ export default async function AdminDashboard() {
         <div className="admin-card-title"><h3>Quick links</h3><span>Common tasks</span></div>
         <div className="admin-alert-row"><strong>Add a phone</strong><Link href="/admin/inventory?add=1">Create a model <ArrowRight size={12} /></Link></div>
         <div className="admin-alert-row"><strong>Record a transaction</strong><Link href="/admin/sales">Open sales <ArrowRight size={12} /></Link></div>
-        {profile.role === 'owner' && <div className="admin-alert-row"><strong>Export a backup</strong><Link href="/api/admin/export">Download ZIP <ArrowRight size={12} /></Link></div>}
+        {profile.role === 'owner' && <div className="admin-alert-row"><strong>Export a backup</strong><BackupStatus /><BackupLink>Download ZIP <ArrowRight size={12} /></BackupLink></div>}
       </article>
     </section>
   </AdminShell>

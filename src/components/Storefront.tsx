@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  ArrowUpRight, BatteryCharging, Camera, Check, ChevronDown, Cpu, HardDrive, Menu, MessageCircle,
+  ArrowUpRight, BatteryCharging, Camera, Check, ChevronDown, Cpu, HardDrive, Menu, MessageCircle, Share2,
   Monitor, PhoneCall, ShieldCheck, Smartphone, X,
 } from 'lucide-react'
 import { useStoreData } from '../context/StoreDataContext'
@@ -105,6 +105,31 @@ export function FloatingWhatsApp() {
   const number = shop.whatsapp[0]
   if (!number) return null
   return <a className={`floating-wa ${onProductPage ? 'floating-wa-product' : ''}`} href={createWhatsAppUrl(`Hello ${shop.name}, I have a question about a phone.`, number)} target="_blank" rel="noreferrer" aria-label="Chat with us on WhatsApp"><MessageCircle size={24} /></a>
+}
+
+export function ShareButton({ title, url }: { title: string; url: string }) {
+  const [open, setOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const text = `${title} at Siaab Mobile`
+  const share = async () => {
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try { await navigator.share({ title, text, url }) } catch { /* the person closed the share sheet */ }
+      return
+    }
+    setOpen((current) => !current)
+  }
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(url); setCopied(true); window.setTimeout(() => setCopied(false), 2000) } catch { setCopied(false) }
+  }
+  return <div className="share-wrap">
+    <button type="button" className="button button-outline button-large" onClick={() => void share()} aria-expanded={open}><Share2 size={17} />Share</button>
+    {open && <div className="share-menu" role="group" aria-label="Share this phone">
+      <a href={`https://wa.me/?text=${encodeURIComponent(`${text}
+${url}`)}`} target="_blank" rel="noreferrer">WhatsApp</a>
+      <a href={`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer">Telegram</a>
+      <button type="button" onClick={() => void copy()}>{copied ? 'Link copied' : 'Copy link'}</button>
+    </div>}
+  </div>
 }
 
 export function Footer() {
