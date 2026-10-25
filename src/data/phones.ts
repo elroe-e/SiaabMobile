@@ -1,6 +1,6 @@
 import type { Phone } from '../types'
 
-const phoneArt = (slug: string, color: string, angle: number) => {
+export const phoneArt = (slug: string, color: string, angle: number) => {
   const id = `${slug.replaceAll('-', '')}${angle}`
   const back = angle % 2 === 1
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 600"><defs><linearGradient id="bg${id}" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f4f7ff"/><stop offset="1" stop-color="#e8edfa"/></linearGradient><linearGradient id="body${id}" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${color}"/><stop offset="1" stop-color="#101d35"/></linearGradient><filter id="shadow${id}" x="-40%" y="-30%" width="180%" height="180%"><feDropShadow dx="0" dy="24" stdDeviation="20" flood-color="#14264a" flood-opacity=".22"/></filter></defs><rect width="480" height="600" rx="36" fill="url(#bg${id})"/><circle cx="390" cy="112" r="92" fill="#fff" opacity=".54"/><ellipse cx="239" cy="518" rx="116" ry="23" fill="#bac8df" opacity=".5"/><g filter="url(#shadow${id})" transform="rotate(${angle * 5 - 5} 240 290)"><rect x="126" y="77" width="228" height="430" rx="38" fill="#17223b"/><rect x="132" y="83" width="216" height="418" rx="33" fill="url(#body${id})"/>${back ? `<rect x="147" y="99" width="84" height="118" rx="22" fill="#0e1830" opacity=".88"/><circle cx="174" cy="128" r="14" fill="#b8c7ec"/><circle cx="204" cy="128" r="14" fill="#b8c7ec"/><circle cx="174" cy="166" r="14" fill="#b8c7ec"/><circle cx="204" cy="166" r="14" fill="#b8c7ec"/>` : `<rect x="139" y="91" width="202" height="402" rx="27" fill="#101a30"/><path d="M146 385c54-104 128-151 188-130v216H146z" fill="#477cf3" opacity=".82"/><path d="M146 424c60-68 122-74 188-58v127H146z" fill="#f7a94b" opacity=".88"/><circle cx="240" cy="102" r="4" fill="#8493af"/>`}</g><text x="240" y="560" font-family="Arial,sans-serif" font-size="13" letter-spacing="3" fill="#667085" text-anchor="middle">SIAAB MOBILE · ${back ? 'DESIGN' : 'COLLECTION'}</text></svg>`
@@ -42,3 +42,5 @@ export const phones: Phone[] = seed.map((phone, index) => ({
   images: [0, 1, 2].map((angle) => phoneArt(phone.slug, phone.colors[angle % phone.colors.length]?.hex ?? '#155eef', angle)),
   advancedSpecs: baseSpecs(phone.simpleSpecs.display, phone.simpleSpecs.camera, phone.simpleSpecs.battery, phone.simpleSpecs.storage, phone.ram.toString(), phone.simpleSpecs.chipset, phone.brand === 'Apple' ? '60 Hz' : '120 Hz', phone.brand === 'Apple' ? 'iOS 17' : 'Android 14', phone.colors.map((color) => color.name).join(' · ')),
 }))
+
+export const placeholderImages = (slug: string, color = '#155eef') => [0, 1, 2].map((angle) => phoneArt(slug, color, angle))

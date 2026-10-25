@@ -11,12 +11,14 @@ export const dynamic = 'force-dynamic'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug?: string[] }> }): Promise<Metadata> {
   const { slug = [] } = await params
+  const alternates = { canonical: `/${slug.join('/')}` }
   if (slug[0] === 'phones' && slug[1]) {
     let catalog = phones
     try { catalog = await getPublicCatalog() } catch (error) { console.error('Could not load dynamic metadata from Supabase.', error) }
     const phone = catalog.find((item) => item.slug === slug[1])
     if (phone) return {
       title: `${phone.brand} ${phone.model}`,
+      alternates,
       description: `${phone.tagline} Check stock, ETB price, colors, storage, warranty and specifications at Siaab Mobile.`,
       openGraph: { title: `${phone.brand} ${phone.model} | Siaab Mobile`, description: phone.tagline, images: [phone.images[0] ?? '/og-image.svg'] },
     }
@@ -29,7 +31,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug?: st
     about: 'Our story',
     contact: 'Visit or contact us',
   }
-  return { title: titles[slug.join('/')] ?? 'Page not found' }
+  return { title: titles[slug.join('/')] ?? 'Page not found', alternates }
 }
 
 function LoadingStorefront() {

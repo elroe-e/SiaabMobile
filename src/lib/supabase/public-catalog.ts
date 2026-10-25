@@ -1,6 +1,6 @@
 import 'server-only'
 import { createClient } from '@supabase/supabase-js'
-import { phones as samplePhones } from '../../data/phones'
+import { phones as samplePhones, placeholderImages } from '../../data/phones'
 import { getSupabasePublicConfig, isSupabaseConfigured } from './config'
 import type { Phone } from '../../types'
 
@@ -71,7 +71,7 @@ function toPhone(model: PublicModel, variant: PublicVariant, photos: PublicModel
     return groups
   }, {})
   const imagePaths = modelPhotos.length ? modelPhotos.map((photo) => `${publicUrl}/storage/v1/object/public/phone-photos/${photo.path}`) : []
-  const imageSet = imagePaths.length ? imagePaths : samplePhones.find((phone) => phone.slug === model.slug)?.images ?? []
+  const imageSet = imagePaths.length ? imagePaths : samplePhones.find((phone) => phone.slug === model.slug)?.images ?? placeholderImages(model.slug)
   return {
     id: variant.id,
     slug: model.slug,
@@ -133,7 +133,7 @@ export async function getPublicCatalog(): Promise<Phone[]> {
     const model = models.find((item) => item.id === unit.model_id)
     if (!model) return null
     const imagePaths = unit.photos.map((photo) => `${url}/storage/v1/object/public/phone-photos/${photo.path}`)
-    const images = imagePaths.length ? imagePaths : samplePhones.find((phone) => phone.slug === model.slug)?.images ?? []
+    const images = imagePaths.length ? imagePaths : samplePhones.find((phone) => phone.slug === model.slug)?.images ?? placeholderImages(model.slug)
     return {
       id: unit.id, slug: `${model.slug}-used-${unit.id}`, brand: model.brand, model: model.name,
       tagline: `Grade ${unit.grade} · ${unit.battery_health_pct ?? 'Unknown'}% battery health`,

@@ -109,7 +109,9 @@ function Home() {
   </div>
 }
 
-const readFilters = (params: URLSearchParams): CatalogFilters => ({
+const priceCeiling = (items: Phone[]) => Math.max(defaultFilters.maxPrice, Math.ceil(Math.max(0, ...items.map((item) => item.price)) / 10000) * 10000)
+
+const readFilters = (params: URLSearchParams, ceiling = defaultFilters.maxPrice): CatalogFilters => ({
   ...defaultFilters,
   search: params.get('q') ?? '',
   brand: params.get('brand') ?? '',
@@ -118,7 +120,7 @@ const readFilters = (params: URLSearchParams): CatalogFilters => ({
   availability: params.get('availability') ?? '',
   fiveG: params.get('5g') === 'true',
   minPrice: Number(params.get('min')) || 0,
-  maxPrice: Number(params.get('max')) || 150000,
+  maxPrice: Number(params.get('max')) || ceiling,
   sort: params.get('sort') ?? 'popular',
 })
 
@@ -127,14 +129,16 @@ function Catalog() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const [filters, setFilters] = useState(() => readFilters(searchParams))
+  const ceiling = useMemo(() => priceCeiling(phones), [phones])
+  const defaults = useMemo(() => ({ ...defaultFilters, maxPrice: ceiling }), [ceiling])
+  const [filters, setFilters] = useState(() => readFilters(searchParams, ceiling))
   const debouncedSearch = useDebounce(filters.search, 250)
   const [mode, setMode] = useSpecMode()
   const [filtersOpen, setFiltersOpen] = useState(false)
   useEffect(() => {
-    const next = readFilters(searchParams)
+    const next = readFilters(searchParams, ceiling)
     setFilters(next)
-  }, [searchParams])
+  }, [searchParams, ceiling])
   const results = useMemo(() => filterPhones(phones, { ...filters, search: debouncedSearch }), [filters, debouncedSearch])
   const update = (key: keyof CatalogFilters, value: string | number | boolean) => {
     const next = { ...filters, [key]: value }
@@ -143,17 +147,17 @@ function Catalog() {
     const keys: [keyof CatalogFilters, string][] = [['search', 'q'], ['brand', 'brand'], ['storage', 'storage'], ['condition', 'condition'], ['availability', 'availability'], ['minPrice', 'min'], ['maxPrice', 'max'], ['sort', 'sort'], ['fiveG', '5g']]
     for (const [stateKey, param] of keys) {
       const current = next[stateKey]
-      if (current !== defaultFilters[stateKey] && current !== '' && current !== false) params.set(param, String(current))
+      if (current !== defaults[stateKey] && current !== '' && current !== false) params.set(param, String(current))
     }
     router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false })
   }
-  const clear = () => { setFilters(defaultFilters); router.replace(pathname, { scroll: false }) }
+  const clear = () => { setFilters(defaults); router.replace(pathname, { scroll: false }) }
   const brands = [...new Set(phones.map((phone) => phone.brand))]
   const filterPanel = <div className="filter-panel">
     <div className="filter-panel-head"><strong>Refine your search</strong><button type="button" className="text-button" onClick={clear}>Clear all</button></div>
     <label className="field-label">Brand<select value={filters.brand} onChange={(event) => update('brand', event.target.value)}><option value="">All brands</option>{brands.map((brand) => <option key={brand}>{brand}</option>)}</select></label>
     <label className="field-label">Storage<select value={filters.storage} onChange={(event) => update('storage', event.target.value)}><option value="">Any storage</option><option value="128">128 GB or more</option><option value="256">256 GB or more</option><option value="512">512 GB or more</option></select></label>
-    <div className="filter-group"><span className="field-label">Price range</span><div className="price-range-labels"><span>Br {filters.minPrice.toLocaleString()}</span><span>Br {filters.maxPrice.toLocaleString()}</span></div><input aria-label="Maximum price" type="range" min="0" max="150000" step="5000" value={filters.maxPrice} onChange={(event) => update('maxPrice', Number(event.target.value))} /></div>
+    <div className="filter-group"><span className="field-label">Price range</span><div className="price-range-labels"><span>Br {filters.minPrice.toLocaleString()}</span><span>Br {filters.maxPrice.toLocaleString()}</span></div><input aria-label="Maximum price" type="range" min="0" max={ceiling} step="5000" value={filters.maxPrice} onChange={(event) => update('maxPrice', Number(event.target.value))} /></div>
     <label className="field-label">Condition<select value={filters.condition} onChange={(event) => update('condition', event.target.value)}><option value="">Any condition</option><option value="new">New</option><option value="refurbished">Refurbished</option></select></label>
     <label className="field-label">Availability<select value={filters.availability} onChange={(event) => update('availability', event.target.value)}><option value="">All phones</option><option value="in_stock">In stock</option><option value="low_stock">Few left</option><option value="out_of_stock">Sold out</option></select></label>
     <label className="checkbox-line"><input type="checkbox" checked={filters.fiveG} onChange={(event) => update('fiveG', event.target.checked)} /> 5G capable</label>
