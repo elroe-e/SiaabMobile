@@ -22,6 +22,15 @@ const schema = z.object({
   sourceUrls: z.array(z.string().url()).default([]),
 })
 
+/** Search grounding cannot be combined with JSON mode, so pull the JSON object out of the reply text. */
+export function extractJson(text: string): string {
+  const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(text)
+  const candidate = fenced?.[1] ?? text
+  const start = candidate.indexOf('{')
+  const end = candidate.lastIndexOf('}')
+  return start >= 0 && end > start ? candidate.slice(start, end + 1) : candidate
+}
+
 export const geminiProvider: SpecProvider = {
   name: 'ai',
   async fetch({ brand, model }) {
@@ -31,11 +40,11 @@ export const geminiProvider: SpecProvider = {
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(24_000),
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: `Use Google Search grounding to verify specifications for ${brand} ${model}. Return strict JSON only. Use null for anything you cannot verify. Never guess. Include sourceUrls from authoritative public sources. Match this object shape: {"display":{"sizeInches":number|null,"resolution":{"width":number,"height":number}|null,"type":string|null,"refreshRateHz":number|null,"brightnessNits":number|null,"protection":string|null}|null,"chipset":string|null,"cpu":string|null,"gpu":string|null,"rearCamera":[{"name":string,"megapixels":number|null,"details":string|null}]|null,"frontCamera":{"megapixels":number|null,"details":string|null}|null,"batteryMah":number|null,"chargingWatts":number|null,"fiveG":boolean|null,"nfc":boolean|null,"esim":boolean|null,"dimensionsMm":{"height":number,"width":number,"depth":number}|null,"weightGrams":number|null,"waterRating":string|null,"os":string|null,"ramGb":number|null,"storageGb":number|null,"sourceUrls":[string]}.` }] }],
         tools: [{ google_search: {} }],
-        generationConfig: { temperature: 0, responseMimeType: 'application/json' },
+        generationConfig: { temperature: 0 },
       }),
     })
     if (response.status === 429) throw new Error('AI lookup is busy, try again or paste specs.')
@@ -43,7 +52,7 @@ export const geminiProvider: SpecProvider = {
     const data = await response.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] }
     const text = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? '').join('') ?? ''
     let json: unknown
-    try { json = JSON.parse(text) } catch { throw new Error('Gemini returned invalid JSON; try again or paste specs.') }
+    try { json = JSON.parse(extractJson(text)) } catch { throw new Error('Gemini returned invalid JSON; try again or paste specs.') }
     const validated = schema.safeParse(json)
     if (!validated.success) throw new Error('Gemini returned fields that did not match the specification schema.')
     const { sourceUrls, ...rawSpecs } = validated.data
