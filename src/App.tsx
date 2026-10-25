@@ -162,7 +162,7 @@ function Catalog() {
     <div className="page-intro"><div><span className="eyebrow">THE PHONE EDIT</span><h1>Find the one.</h1><p>Explore trusted picks, compare the details, and find a fit for the way you live.</p></div><div className="page-intro-note"><ShieldCheck size={18} /><span>Every phone, backed by<br /><strong>real local support.</strong></span></div></div>
     <div className="catalog-toolbar"><label className="search-field"><Search size={18} /><span className="sr-only">Search by brand or model</span><input value={filters.search} onChange={(event) => update('search', event.target.value)} placeholder="Search a brand or model" /></label><div className="catalog-toolbar-actions"><button className="button button-light filter-open" type="button" onClick={() => setFiltersOpen(true)}>Filters <span className="filter-count">{Number(Boolean(filters.brand)) + Number(Boolean(filters.condition)) + Number(filters.fiveG)}</span></button><label className="sort-select"><span className="sr-only">Sort phones</span><select value={filters.sort} onChange={(event) => update('sort', event.target.value)}><option value="popular">Most popular</option><option value="price-asc">Price: low to high</option><option value="price-desc">Price: high to low</option><option value="newest">Newest added</option></select></label></div></div>
     <div className="catalog-layout"><aside className="catalog-sidebar">{filterPanel}</aside><div className="catalog-results"><div className="results-heading"><span><strong>{results.length}</strong> phones for you</span><div className="spec-mode-control"><span>Specs:</span><SpecSwitcher mode={mode} onChange={setMode} /></div></div>
-      {results.length ? <div className="phone-grid">{results.map((phone) => <PhoneCard key={phone.id} phone={phone} mode={mode} />)}</div> : <div className="empty-state"><span className="empty-icon"><Search size={23} /></span><h2>No phones found. Yet.</h2><p>Try another search or clear a filter to see more of our collection.</p><button type="button" onClick={clear} className="button button-primary">Clear filters</button></div>}
+      {results.length ? <><h2 className="sr-only">Phones</h2><div className="phone-grid">{results.map((phone) => <PhoneCard key={phone.id} phone={phone} mode={mode} />)}</div></> : <div className="empty-state"><span className="empty-icon"><Search size={23} /></span><h2>No phones found. Yet.</h2><p>Try another search or clear a filter to see more of our collection.</p><button type="button" onClick={clear} className="button button-primary">Clear filters</button></div>}
     </div></div>
     {filtersOpen && <div className="sheet-backdrop" onClick={() => setFiltersOpen(false)}><div className="mobile-filter-sheet" onClick={(event) => event.stopPropagation()}><div className="sheet-handle" /><div className="sheet-title"><h2>Filters</h2><button type="button" onClick={() => setFiltersOpen(false)} aria-label="Close filters"><X /></button></div>{filterPanel}<button type="button" className="button button-primary sheet-apply" onClick={() => setFiltersOpen(false)}>Show {results.length} phones</button></div></div>}
   </div>
@@ -215,7 +215,7 @@ function PhoneDetail() {
   const selected = phone.storageOptions.find((option) => option.gb === storage) ?? phone.storageOptions[0]!
   const orderMessage = phone.stock === 'out_of_stock'
     ? `Hello ${shop.name}, please let me know when ${phone.brand} ${phone.model} is back in stock.`
-    : phoneOrderMessage(`${phone.brand} ${phone.model}`, formatStorage(selected.gb), color, formatPrice(selected.price), window.location.href, shop.name)
+    : phoneOrderMessage(`${phone.brand} ${phone.model}`, formatStorage(selected.gb), color, formatPrice(selected.price), `${shop.siteUrl}${pathname}`, shop.name)
   const orderUrl = createWhatsAppUrl(orderMessage, shop.whatsapp[0])
   const similar = phones.filter((item) => item.id !== phone.id && (item.brand === phone.brand || Math.abs(item.price - phone.price) < 16000)).slice(0, 4)
   const productSchema = { '@context': 'https://schema.org', '@type': 'Product', name: `${phone.brand} ${phone.model}`, description: phone.tagline, brand: { '@type': 'Brand', name: phone.brand }, offers: { '@type': 'Offer', priceCurrency: 'ETB', price: selected.price, availability: phone.stock === 'out_of_stock' ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock' } }
@@ -252,7 +252,7 @@ function Upcoming() {
     focusable()?.[1]?.focus()
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setSelected(null)
+        close()
         return
       }
       if (event.key !== 'Tab') return
@@ -334,6 +334,9 @@ export function TradeIn() {
   const [manualName, setManualName] = useState('')
   const [manualContact, setManualContact] = useState('')
   const [manualSent, setManualSent] = useState(false)
+  const [bookOpen, setBookOpen] = useState(false)
+  const [bookName, setBookName] = useState('')
+  const [bookContact, setBookContact] = useState('')
   const [mode, setMode] = useState<'estimate' | 'manual' | 'result'>('estimate')
   const brands = [...new Set(tradeInValues.map((item) => item.brand))]
   const models = [...new Set(tradeInValues.filter((item) => item.brand === brand).map((item) => item.model))]
@@ -344,6 +347,26 @@ export function TradeIn() {
   const changeAnswer = <K extends keyof TradeInAnswers>(key: K, value: TradeInAnswers[K]) => {
     setAnswers((current) => ({ ...current, [key]: value }))
     setAnswered((current) => current.includes(key) ? current : [...current, key])
+  }
+  const picked = (key: string) => answered.includes(key)
+  const bookInspection = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!estimate || !bookName.trim() || !bookContact.trim()) return
+    const message = tradeInMessage(`${brand} ${model}`, `${storage} GB`, answers, estimate, shop.name)
+    const url = createWhatsAppUrl(`${message}
+Name: ${bookName.trim()}
+Contact: ${bookContact.trim()}`, shop.whatsapp[0])
+    const popup = window.open(url, '_blank', 'noopener,noreferrer')
+    void fetch('/api/leads', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'trade_in', name: bookName.trim(), contact: bookContact.trim(), payload: { model: `${brand} ${model}`, storageGb: Number(storage), answers, estimate: estimate.estimate, target: target?.model } }),
+    }).then(async (response) => {
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}))
+        window.alert(result.error ?? 'Your WhatsApp message is ready, but the request was not saved to the shop inbox.')
+      }
+    }).catch(() => window.alert('Your WhatsApp message is ready, but the request could not be saved to the shop inbox.'))
+    if (!popup) window.location.assign(url)
   }
   const validateStep = () => {
     if (step === 1 && (!brand || !model || (!isOther && !storage))) {
@@ -406,39 +429,21 @@ export function TradeIn() {
               <button type="button" className="button button-primary button-full trade-next" onClick={() => { if (brand === 'Other') { setMode('manual'); return } if (model === 'Other / not listed') setModel('__other__'); next() }}>Continue <ArrowRight size={17} /></button>
             </div>}
             {step === 2 && <div className="trade-step-content"><button type="button" className="back-link" onClick={() => setStep(1)}><ArrowLeft size={15} />Back</button><span className="step-icon"><ShieldCheck size={20} /></span><h2>Let’s check its condition.</h2><p>A few honest answers help us make a fair estimate.</p>
-              {(Object.entries(conditionOptions) as [keyof typeof conditionOptions, readonly (readonly [string, string])[]][]).map(([field, options]) => <fieldset className="choice-field" key={field}><legend>{field === 'condition' ? 'Overall condition' : field === 'screen' ? 'Screen' : field === 'body' ? 'Back & body' : field === 'battery' ? 'Battery health' : 'Accessories'}</legend><div className={`choice-grid ${options.length === 4 ? 'four' : ''}`}>{options.map(([value, label]) => <label key={value} className={`choice-card ${answers[field] === value ? 'selected' : ''}`}><input type="radio" name={field} checked={answers[field] === value} onChange={() => {
+              {(Object.entries(conditionOptions) as [keyof typeof conditionOptions, readonly (readonly [string, string])[]][]).map(([field, options]) => <fieldset className="choice-field" key={field}><legend>{field === 'condition' ? 'Overall condition' : field === 'screen' ? 'Screen' : field === 'body' ? 'Back & body' : field === 'battery' ? 'Battery health' : 'Accessories'}</legend><div className={`choice-grid ${options.length === 4 ? 'four' : ''}`}>{options.map(([value, label]) => <label key={value} className={`choice-card ${picked(field) && answers[field] === value ? 'selected' : ''}`}><input type="radio" name={field} checked={picked(field) && answers[field] === value} onChange={() => {
                 if (field === 'condition') changeAnswer('condition', value as TradeInAnswers['condition'])
                 else if (field === 'screen') changeAnswer('screen', value as TradeInAnswers['screen'])
                 else if (field === 'body') changeAnswer('body', value as TradeInAnswers['body'])
                 else if (field === 'battery') changeAnswer('battery', value as TradeInAnswers['battery'])
                 else changeAnswer('accessories', value as TradeInAnswers['accessories'])
-              }} /><span>{label}</span>{answers[field] === value && <Check size={14} />}</label>)}</div></fieldset>)}
-              <fieldset className="choice-field"><legend>Does it power on and work fully?</legend><div className="choice-grid two"><label className={`choice-card ${answers.powersOn ? 'selected' : ''}`}><input type="radio" name="power" checked={answers.powersOn} onChange={() => changeAnswer('powersOn', true)} /><span>Yes, fully</span>{answers.powersOn && <Check size={14} />}</label><label className={`choice-card ${!answers.powersOn ? 'selected' : ''}`}><input type="radio" name="power" checked={!answers.powersOn} onChange={() => changeAnswer('powersOn', false)} /><span>It has issues</span>{!answers.powersOn && <Check size={14} />}</label></div>{!answers.powersOn && <div className="issue-options">{issueOptions.map((issue) => <label key={issue}><input type="checkbox" checked={answers.issues.includes(issue)} onChange={(event) => changeAnswer('issues', event.target.checked ? [...answers.issues, issue] : answers.issues.filter((item) => item !== issue))} />{issue}</label>)}</div>}</fieldset>
-              <fieldset className="choice-field"><legend>Is it locked to an account or carrier?</legend><div className="choice-grid two"><label className={`choice-card ${!answers.locked ? 'selected' : ''}`}><input type="radio" name="locked" checked={!answers.locked} onChange={() => changeAnswer('locked', false)} /><span>No, it’s unlocked</span>{!answers.locked && <Check size={14} />}</label><label className={`choice-card ${answers.locked ? 'selected' : ''}`}><input type="radio" name="locked" checked={answers.locked} onChange={() => changeAnswer('locked', true)} /><span>Yes, it’s locked</span>{answers.locked && <Check size={14} />}</label></div>{answers.locked && <p className="locked-warning" role="alert"><CircleHelp size={16} />Locked phones can’t be accepted until they are fully unlocked.</p>}</fieldset>
+              }} /><span>{label}</span>{picked(field) && answers[field] === value && <Check size={14} />}</label>)}</div></fieldset>)}
+              <fieldset className="choice-field"><legend>Does it power on and work fully?</legend><div className="choice-grid two"><label className={`choice-card ${picked('powersOn') && answers.powersOn ? 'selected' : ''}`}><input type="radio" name="power" checked={picked('powersOn') && answers.powersOn} onChange={() => changeAnswer('powersOn', true)} /><span>Yes, fully</span>{picked('powersOn') && answers.powersOn && <Check size={14} />}</label><label className={`choice-card ${picked('powersOn') && !answers.powersOn ? 'selected' : ''}`}><input type="radio" name="power" checked={picked('powersOn') && !answers.powersOn} onChange={() => changeAnswer('powersOn', false)} /><span>It has issues</span>{picked('powersOn') && !answers.powersOn && <Check size={14} />}</label></div>{!answers.powersOn && <div className="issue-options">{issueOptions.map((issue) => <label key={issue}><input type="checkbox" checked={answers.issues.includes(issue)} onChange={(event) => changeAnswer('issues', event.target.checked ? [...answers.issues, issue] : answers.issues.filter((item) => item !== issue))} />{issue}</label>)}</div>}</fieldset>
+              <fieldset className="choice-field"><legend>Is it locked to an account or carrier?</legend><div className="choice-grid two"><label className={`choice-card ${picked('locked') && !answers.locked ? 'selected' : ''}`}><input type="radio" name="locked" checked={picked('locked') && !answers.locked} onChange={() => changeAnswer('locked', false)} /><span>No, it’s unlocked</span>{picked('locked') && !answers.locked && <Check size={14} />}</label><label className={`choice-card ${picked('locked') && answers.locked ? 'selected' : ''}`}><input type="radio" name="locked" checked={picked('locked') && answers.locked} onChange={() => changeAnswer('locked', true)} /><span>Yes, it’s locked</span>{picked('locked') && answers.locked && <Check size={14} />}</label></div>{answers.locked && <p className="locked-warning" role="alert"><CircleHelp size={16} />Locked phones can’t be accepted until they are fully unlocked.</p>}</fieldset>
               {error && <p className="form-error" role="alert">{error}</p>}<button type="button" className="button button-primary button-full trade-next" onClick={next}>See my estimate <ArrowRight size={17} /></button>
             </div>}
             {step === 3 && estimate && <div className="trade-result"><button type="button" className="back-link" onClick={() => setStep(2)}><ArrowLeft size={15} />Back to condition</button><div className={`estimate-hero ${!estimate.eligible ? 'estimate-ineligible' : ''}`}><span className="eyebrow">{estimate.eligible ? 'YOUR ESTIMATED TRADE-IN VALUE' : 'TRADE-IN STATUS'}</span>{estimate.eligible ? <><strong>{formatPrice(estimate.estimate ?? 0)}</strong><span className="estimate-range">{formatPrice(estimate.min ?? 0)} – {formatPrice(estimate.max ?? 0)}</span><small>Estimated value range</small></> : <><strong className="ineligible-title">Not eligible yet</strong><span className="estimate-range">Unlock this phone first</span><small>We can only accept unlocked devices.</small></>}</div>
               {estimate.eligible && <><div className="estimate-breakdown"><div><strong>Estimate breakdown</strong><span>Starting value: {formatPrice(estimate.baseValue)}</span></div>{estimate.deductions.length ? estimate.deductions.map((deduction) => <div key={deduction.label}><span>{deduction.label}</span><span>− {formatPrice(deduction.amount)}</span></div>) : <div><span>Excellent condition</span><span>No deductions</span></div>}</div><p className="estimate-disclaimer">Estimate only. Final value is confirmed after an in-store inspection.</p></>}
               {target && estimate.eligible && <div className="trade-target"><span className="eyebrow">PUT IT TOWARD SOMETHING NEW</span><label className="field-label">Choose a phone<select value={targetSlug} onChange={(event) => setTargetSlug(event.target.value)}>{phones.map((phone) => <option key={phone.slug} value={phone.slug}>{phone.brand} {phone.model}</option>)}</select></label><div><span>{formatPrice(targetPrice)} − {formatPrice(tradeValue)}</span><strong>≈ {formatPrice(Math.max(0, targetPrice - tradeValue))}</strong></div><small>Estimated balance after trade-in. Subject to inspection.</small></div>}
-              <button type="button" onClick={() => {
-                const name = window.prompt('Your name for the shop request:')
-                if (!name?.trim()) return
-                const contact = window.prompt('Phone, Telegram or email:')
-                if (!contact?.trim()) return
-                const message = tradeInMessage(`${brand} ${model}`, `${storage} GB`, answers, estimate, shop.name)
-                const url = createWhatsAppUrl(`${message}\nName: ${name.trim()}\nContact: ${contact.trim()}`, shop.whatsapp[0])
-                const popup = window.open(url, '_blank', 'noopener,noreferrer')
-                void fetch('/api/leads', {
-                  method: 'POST', headers: { 'content-type': 'application/json' },
-                  body: JSON.stringify({ type: 'trade_in', name: name.trim(), contact: contact.trim(), payload: { model: `${brand} ${model}`, storageGb: Number(storage), answers, estimate: estimate.estimate, target: target?.model } }),
-                }).then(async (response) => {
-                  if (!response.ok) {
-                    const result = await response.json().catch(() => ({}))
-                    window.alert(result.error ?? 'Your WhatsApp message is ready, but the request was not saved to the shop inbox.')
-                  }
-                }).catch(() => window.alert('Your WhatsApp message is ready, but the request could not be saved to the shop inbox.'))
-                if (!popup) window.location.assign(url)
-              }} className="button button-whatsapp button-full"><MessageCircle size={17} />Book an inspection on WhatsApp</button><button type="button" className="button button-outline button-full" onClick={() => { if (!target) setTargetSlug(phones[0]?.slug ?? '') }}><CreditCard size={17} />{target ? 'Estimated price above' : 'Use this toward a new phone'}</button><button type="button" className="text-button start-over" onClick={reset}>Start over</button>
+              {bookOpen ? <form className="trade-book" onSubmit={bookInspection}><label className="field-label">Your name<input autoComplete="name" value={bookName} onChange={(event) => setBookName(event.target.value)} required /></label><label className="field-label">Phone, Telegram or email<input value={bookContact} onChange={(event) => setBookContact(event.target.value)} required placeholder="+251 … / @username / email" /></label><button type="submit" className="button button-whatsapp button-full"><MessageCircle size={17} />Send on WhatsApp</button></form> : <button type="button" onClick={() => setBookOpen(true)} className="button button-whatsapp button-full"><MessageCircle size={17} />Book an inspection on WhatsApp</button>}<button type="button" className="button button-outline button-full" onClick={() => { if (!target) setTargetSlug(phones[0]?.slug ?? '') }}><CreditCard size={17} />{target ? 'Estimated price above' : 'Use this toward a new phone'}</button><button type="button" className="text-button start-over" onClick={reset}>Start over</button>
             </div>}
           </>}
       </section>

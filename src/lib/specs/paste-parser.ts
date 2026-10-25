@@ -59,7 +59,8 @@ export function parsePastedSpecs(text: string): PartialSpecs {
   if (frontCamera) parsed.frontCamera = { megapixels: parseNumber(frontCamera, /([\d.]+)\s*MP/i), details: frontCamera }
   if (os) parsed.os = os
   if (dimensionsText) {
-    const numbers = [...dimensionsText.matchAll(/([\d.]+)\s*mm/gi)].map((match) => Number(match[1]))
+    const compact = /([\d.]+)\s*[x×]\s*([\d.]+)\s*[x×]\s*([\d.]+)\s*mm/i.exec(dimensionsText)
+    const numbers = compact ? [compact[1], compact[2], compact[3]].map(Number) : [...dimensionsText.matchAll(/([\d.]+)\s*mm/gi)].map((match) => Number(match[1]))
     if (numbers.length >= 3) parsed.dimensionsMm = { height: numbers[0] ?? 0, width: numbers[1] ?? 0, depth: numbers[2] ?? 0 }
   }
   if (weightText) parsed.weightGrams = parseNumber(weightText, /([\d.]+)\s*g(?:rams?)?/i)

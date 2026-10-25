@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
+import { notFound } from 'next/navigation'
 import App from '../../src/App'
 import { phones } from '../../src/data/phones'
 import { getPublicCatalog } from '../../src/lib/supabase/public-catalog'
@@ -35,7 +36,10 @@ function LoadingStorefront() {
   return <main className="container page-container" aria-busy="true"><p>Loading Siaab Mobile…</p></main>
 }
 
-export default async function StorefrontPage() {
+const knownPages = new Set(['', 'phones', 'upcoming', 'trade-in', 'about', 'contact'])
+
+export default async function StorefrontPage({ params }: { params: Promise<{ slug?: string[] }> }) {
+  const { slug = [] } = await params
   let catalog = phones
   let storeData: StoreData | null = null
   try {
@@ -43,5 +47,8 @@ export default async function StorefrontPage() {
   } catch (error) {
     console.error('Supabase public data unavailable; rendering editable sample data.', error)
   }
+  const path = slug.join('/')
+  const isPhonePage = slug[0] === 'phones' && slug.length === 2 && catalog.some((item) => item.slug === slug[1])
+  if (!knownPages.has(path) && !isPhonePage) notFound()
   return <Suspense fallback={<LoadingStorefront />}><App initialPhones={catalog} {...(storeData ? { initialStoreData: storeData } : {})} /></Suspense>
 }

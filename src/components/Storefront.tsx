@@ -68,7 +68,7 @@ export function Header() {
   return (
     <header className="site-header">
       <div className="header-inner">
-        <Link href="/" className="brand-lockup" aria-label="Siaab Mobile home">
+        <Link href="/" className="brand-lockup" aria-label="siaabmobile home">
           <span className="brand-mark"><Smartphone size={19} strokeWidth={2.4} /></span>
           <span className="brand-name">siaab<span>mobile</span></span>
         </Link>
@@ -158,7 +158,7 @@ export function PhoneCard({ phone, mode = 'simple', compact = false }: { phone: 
   const order = createWhatsAppUrl(orderMessage, shop.whatsapp[0])
   return (
     <article className={`phone-card ${compact ? 'phone-card-compact' : ''}`}>
-      <Link href={`/phones/${phone.slug}`} className="product-art-link" aria-label={`View ${phone.brand} ${phone.model}`}>
+      <Link href={`/phones/${phone.slug}`} className="product-art-link">
         <img className="product-art" src={phone.images[0]} alt={`${phone.brand} ${phone.model} phone`} loading="lazy" />
         <div className="product-card-badges">{phone.badges.slice(0, 1).map((badge) => <span className="pill" key={badge}>{badge}</span>)}</div>
         <span className="product-arrow"><ArrowUpRight size={17} /></span>
