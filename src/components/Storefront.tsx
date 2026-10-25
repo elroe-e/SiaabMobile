@@ -98,6 +98,15 @@ export function Header() {
   )
 }
 
+export function FloatingWhatsApp() {
+  const pathname = usePathname()
+  const { shop } = useStoreData()
+  const onProductPage = pathname.startsWith('/phones/')
+  const number = shop.whatsapp[0]
+  if (!number) return null
+  return <a className={`floating-wa ${onProductPage ? 'floating-wa-product' : ''}`} href={createWhatsAppUrl(`Hello ${shop.name}, I have a question about a phone.`, number)} target="_blank" rel="noreferrer" aria-label="Chat with us on WhatsApp"><MessageCircle size={24} /></a>
+}
+
 export function Footer() {
   const { shop } = useStoreData()
   return (
@@ -121,8 +130,9 @@ export function SectionHeading({ eyebrow, title, text, link, to }: { eyebrow: st
 }
 
 const statusLabel = { in_stock: 'In stock', low_stock: 'Only a few left', out_of_stock: 'Sold out' }
-export function StockBadge({ stock }: { stock: Phone['stock'] }) {
-  return <span className={`stock-badge stock-${stock}`}><span />{statusLabel[stock]}</span>
+export function StockBadge({ stock, count }: { stock: Phone['stock']; count?: number }) {
+  const label = stock === 'out_of_stock' ? statusLabel.out_of_stock : count === undefined ? statusLabel[stock] : count < 10 ? `${count} in stock` : statusLabel.in_stock
+  return <span className={`stock-badge stock-${stock}`}><span />{label}</span>
 }
 
 export function SpecSwitcher({ mode, onChange }: { mode: SpecMode; onChange: (mode: SpecMode) => void }) {
@@ -164,7 +174,7 @@ export function PhoneCard({ phone, mode = 'simple', compact = false }: { phone: 
         <span className="product-arrow"><ArrowUpRight size={17} /></span>
       </Link>
       <div className="phone-card-content">
-        <div className="phone-card-title"><div><span className="phone-brand">{phone.brand}</span><h3><Link href={`/phones/${phone.slug}`}>{phone.model}</Link></h3></div><StockBadge stock={phone.stock} /></div>
+        <div className="phone-card-title"><div><span className="phone-brand">{phone.brand}</span><h3><Link href={`/phones/${phone.slug}`}>{phone.model}</Link></h3></div><StockBadge stock={phone.stock} count={phone.stockCount} /></div>
         <KeySpecs phone={phone} mode={mode} />
         <div className="phone-card-footer"><div><span className="price-label">From</span><strong>{formatPrice(phone.price)}</strong>{phone.oldPrice && <del>{formatPrice(phone.oldPrice)}</del>}</div><div className="phone-card-actions"><Link href={`/phones/${phone.slug}`} className="button button-light button-small">Details</Link><a href={order} target="_blank" rel="noreferrer" className={`button button-whatsapp button-small ${phone.stock === 'out_of_stock' ? 'button-disabled' : ''}`} aria-label={phone.stock === 'out_of_stock' ? `Ask when ${phone.model} will be available` : `Ask about ${phone.model} on WhatsApp`}><MessageCircle size={15} />{phone.stock === 'out_of_stock' ? 'Notify' : 'WhatsApp'}</a></div></div>
       </div>

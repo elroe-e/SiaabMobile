@@ -49,6 +49,7 @@ const getNumber = (value: unknown) => typeof value === 'number' && Number.isFini
 function toPhone(model: PublicModel, variant: PublicVariant, photos: PublicModelPhoto[], publicUrl: string, modelVariants: Map<string, PublicVariant[]>): Phone {
   const modelPhotos = photos.filter((photo) => photo.model_id === model.id).sort((a, b) => a.sort_order - b.sort_order)
   const storageVariants = modelVariants.get(model.id) ?? [variant]
+  const totalStock = storageVariants.reduce((sum, item) => sum + item.stock_count, 0)
   const camera = Array.isArray(model.specs.rearCamera)
     ? model.specs.rearCamera.map((item) => {
       if (typeof item !== 'object' || !item || !('megapixels' in item)) return ''
@@ -81,8 +82,8 @@ function toPhone(model: PublicModel, variant: PublicVariant, photos: PublicModel
     price: Number(variant.price),
     ...(variant.old_price ? { oldPrice: Number(variant.old_price) } : {}),
     currency: 'ETB',
-    stock: variant.stock_status,
-    stockCount: variant.stock_count,
+    stock: totalStock === 0 ? 'out_of_stock' : totalStock <= 2 ? 'low_stock' : 'in_stock',
+    stockCount: totalStock,
     condition: 'new',
     warrantyMonths: 12,
     colors: [...new Map(storageVariants.map((item) => [item.color_name, { name: item.color_name, hex: item.color_hex }])).values()],
@@ -128,7 +129,11 @@ export async function getPublicCatalog(): Promise<Phone[]> {
     current.push(variant)
     modelVariants.set(variant.model_id, current)
   }
-  const newPhones = models.flatMap((model) => (modelVariants.get(model.id) ?? []).map((variant) => toPhone(model, variant, photos, url, modelVariants)))
+  // One card per phone model, led by its cheapest variant; colours and storage options are gathered inside toPhone.
+  const newPhones = models.flatMap((model) => {
+    const cheapest = [...(modelVariants.get(model.id) ?? [])].sort((a, b) => Number(a.price) - Number(b.price))[0]
+    return cheapest ? [toPhone(model, cheapest, photos, url, modelVariants)] : []
+  })
   const usedPhones = units.map((unit): Phone | null => {
     const model = models.find((item) => item.id === unit.model_id)
     if (!model) return null

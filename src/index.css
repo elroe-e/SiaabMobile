@@ -817,3 +817,16 @@ p { color: var(--muted); line-height: 1.72; }
 .color-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; }
 .color-list li { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--white); color: var(--ink-soft); font-size: 13px; font-weight: 600; }
 .color-dot { width: 14px; height: 14px; border: 1px solid rgba(23,36,60,.18); border-radius: 50%; background: var(--swatch, #8a94a6); }
+.brand-chips { display: flex; gap: 8px; margin-bottom: 14px; padding-bottom: 4px; overflow-x: auto; scrollbar-width: none; }
+.brand-chips::-webkit-scrollbar { display: none; }
+.brand-chips button { flex: 0 0 auto; min-height: 38px; padding: 0 16px; border: 1px solid var(--line); border-radius: 999px; background: var(--white); color: var(--ink-soft); font-size: 13px; font-weight: 700; cursor: pointer; transition: background .16s ease, color .16s ease, border-color .16s ease, transform .16s var(--ease-out); }
+.brand-chips button:active { transform: scale(.97); }
+.brand-chips button.active { border-color: var(--blue); background: var(--blue); color: var(--white); }
+.assurance-list { display: grid; gap: 6px; margin: 14px 0 0; padding: 0; list-style: none; }
+.assurance-list li { display: flex; align-items: center; gap: 8px; color: var(--ink-soft); font-size: 13px; }
+.assurance-list svg { color: var(--green); flex: none; }
+.floating-wa { position: fixed; z-index: 35; right: max(18px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom)); width: 54px; height: 54px; display: grid; place-items: center; border-radius: 50%; background: #158565; color: var(--white); box-shadow: 0 10px 26px rgba(15,60,45,.32); transition: transform .16s var(--ease-out), background .16s ease; }
+.floating-wa:active { transform: scale(.94); }
+@media (hover: hover) and (pointer: fine) { .floating-wa:hover { background: #0e7153; transform: translateY(-2px); } }
+@media (max-width: 900px) { .floating-wa-product { display: none; } }
+@media (prefers-reduced-motion: reduce) { .floating-wa:hover, .floating-wa:active { transform: none; } }
