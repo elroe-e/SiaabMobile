@@ -1,6 +1,7 @@
 'use client'
 
 import { BackupLink, BackupStatus } from '../backup-status'
+import { TwoFactorCard } from './two-factor'
 import { useCallback, useEffect, useState } from 'react'
 import { Download, Plus, Trash2 } from 'lucide-react'
 
@@ -71,6 +72,7 @@ export function SettingsManager() {
     <div className="admin-page-heading"><div><h2>Owner settings</h2><p>Store details, trade-in values, staff access and backup tools.</p></div><BackupLink className="button button-outline button-small"><Download size={14} /> Export everything</BackupLink></div>
     <div className="admin-alert"><strong>Backup reminder:</strong> <BackupStatus /> Download a fresh export monthly and keep it in a private, encrypted location. Never share the owner export; it contains private customer and inventory records.</div>
     {error && <div className="admin-error" role="alert">{error}</div>}{notice && <div className="admin-success" role="status">{notice}</div>}
+    <TwoFactorCard />
     <form className="admin-card" onSubmit={save}>
       <div className="admin-card-title"><h3>Store details</h3><span>Shown across your storefront</span></div>
       <div className="admin-form-grid">

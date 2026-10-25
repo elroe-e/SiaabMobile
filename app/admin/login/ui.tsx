@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import type { AuthChangeEvent } from '@supabase/supabase-js'
 import { getBrowserSupabase } from '../../../src/lib/supabase/browser'
 import { getSupabasePublicConfig } from '../../../src/lib/supabase/config'
+import { needsSecondStep } from '../../../src/lib/supabase/mfa'
 
 export function AdminLogin() {
   const router = useRouter()
@@ -14,7 +15,10 @@ export function AdminLogin() {
   const [password, setPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [setPasswordMode, setSetPasswordMode] = useState(false)
+
   const [busy, setBusy] = useState(false)
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null)
+  const [mfaCode, setMfaCode] = useState('')
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   let configured = true
@@ -35,6 +39,7 @@ export function AdminLogin() {
 
     if (!configured) return
     const supabase = getBrowserSupabase()
+    if (params.get('mfa') === '1') void askForCodeIfNeeded()
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent) => {
       if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && isPasswordLink)) {
         setSetPasswordMode(true)
@@ -43,6 +48,32 @@ export function AdminLogin() {
     return () => subscription.unsubscribe()
   }, [configured])
 
+  const askForCodeIfNeeded = async () => {
+    const supabase = getBrowserSupabase()
+    const { data: level } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+    if (!needsSecondStep(level)) return false
+    const { data: factors } = await supabase.auth.mfa.listFactors()
+    const factorId = factors?.totp?.[0]?.id
+    if (!factorId) return false
+    setMfaFactorId(factorId)
+    return true
+  }
+
+  const verifyCode = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!mfaFactorId) return
+    setBusy(true)
+    setError('')
+    const { error: verifyError } = await getBrowserSupabase().auth.mfa.challengeAndVerify({ factorId: mfaFactorId, code: mfaCode.trim() })
+    if (verifyError) {
+      setError(verifyError.message)
+      setBusy(false)
+      return
+    }
+    router.replace('/admin')
+    router.refresh()
+  }
+
   const signIn = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setBusy(true)
@@ -50,6 +81,10 @@ export function AdminLogin() {
     const { error: loginError } = await getBrowserSupabase().auth.signInWithPassword({ email: email.trim(), password })
     if (loginError) {
       setError(loginError.message)
+      setBusy(false)
+      return
+    }
+    if (await askForCodeIfNeeded()) {
       setBusy(false)
       return
     }
@@ -101,9 +136,15 @@ export function AdminLogin() {
     </aside>
     <section className="admin-login-main">
       <div className="admin-login-card">
-        <h2>{setPasswordMode ? 'Set your password' : 'Welcome back'}</h2>
-        <p>{setPasswordMode ? 'Choose a new password to finish setting up your shop account.' : 'Sign in with your shop account to continue.'}</p>
-        {setPasswordMode ? <form className="admin-login-form" onSubmit={updatePassword}>
+        <h2>{mfaFactorId ? 'Enter your code' : setPasswordMode ? 'Set your password' : 'Welcome back'}</h2>
+        <p>{mfaFactorId ? 'Open your authenticator app and type the 6-digit code for Siaab Mobile.' : setPasswordMode ? 'Choose a new password to finish setting up your shop account.' : 'Sign in with your shop account to continue.'}</p>
+        {mfaFactorId ? <form className="admin-login-form" onSubmit={verifyCode}>
+          <label className="admin-label">6-digit code
+            <span className="input-icon-wrap"><LockKeyhole size={14} /><input className="admin-input" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required autoFocus value={mfaCode} onChange={(event) => setMfaCode(event.target.value)} /></span>
+          </label>
+          {error && <div className="admin-error" role="alert">{error}</div>}
+          <button className="button button-primary" type="submit" disabled={busy}>{busy ? 'Please wait…' : 'Verify and continue'}</button>
+        </form> : setPasswordMode ? <form className="admin-login-form" onSubmit={updatePassword}>
           <label className="admin-label">New password
             <span className="input-icon-wrap"><LockKeyhole size={14} /><input className="admin-input" autoComplete="new-password" type="password" minLength={12} required value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="At least 12 characters" /></span>
           </label>

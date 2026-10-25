@@ -130,3 +130,13 @@ describe('phone display names', () => {
     expect(fullPhoneName('Xiaomi', 'Redmi Note 13 Pro')).toBe('Xiaomi Redmi Note 13 Pro')
   })
 })
+
+describe('two-factor sign-in gate', () => {
+  it('only asks for a code when a verified factor exists and the session is still at the password level', async () => {
+    const { needsSecondStep } = await import('../lib/supabase/mfa')
+    expect(needsSecondStep({ currentLevel: 'aal1', nextLevel: 'aal2' })).toBe(true)
+    expect(needsSecondStep({ currentLevel: 'aal2', nextLevel: 'aal2' })).toBe(false)
+    expect(needsSecondStep({ currentLevel: 'aal1', nextLevel: 'aal1' })).toBe(false)
+    expect(needsSecondStep(null)).toBe(false)
+  })
+})
