@@ -21,9 +21,8 @@ const navLinks = [
 ]
 
 function LanguageToggle() {
-  const t = useT()
   const { lang, setLang } = useLanguage()
-  return <button type="button" className="lang-toggle" onClick={() => setLang(lang === 'am' ? 'en' : 'am')} aria-label={lang === 'am' ? t("Switch to English") : t("ወደ አማርኛ ቀይር (Switch to Amharic)")}>{lang === 'am' ? t("EN") : 'አማ'}</button>
+  return <button type="button" className="lang-toggle" onClick={() => setLang(lang === 'am' ? 'en' : 'am')} aria-label={lang === 'am' ? 'English (EN)' : 'አማርኛ (Amharic)'}>{lang === 'am' ? 'EN' : 'አማ'}</button>
 }
 
 export function Header() {
