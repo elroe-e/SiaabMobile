@@ -189,11 +189,14 @@ export function SpecSwitcher({ mode, onChange }: { mode: SpecMode; onChange: (mo
 }
 
 const specIcons = { display: Monitor, camera: Camera, battery: BatteryCharging, storage: HardDrive, ram: Cpu, chipset: Smartphone } as const
+const specLabels: Record<string, string> = { display: 'Display', camera: 'Camera', battery: 'Battery', storage: 'Storage', ram: 'RAM', chipset: 'Chipset' }
+
 export function KeySpecs({ phone, mode }: { phone: Phone; mode: SpecMode }) {
+  const t = useT()
   if (mode === 'simple') {
     return <div className="key-spec-grid">{Object.entries(phone.simpleSpecs).map(([key, value]) => {
       const Icon = specIcons[key as keyof typeof specIcons]
-      return <div className="key-spec" key={key}><Icon size={16} /><span>{key}</span><strong>{value}</strong></div>
+      return <div className="key-spec" key={key}><Icon size={16} /><span>{specLabels[key] ? t(specLabels[key]) : key}</span><strong>{value}</strong></div>
     })}</div>
   }
   return <div className="card-advanced-specs">{Object.entries(phone.advancedSpecs).slice(0, 3).map(([group, specs]) => <div key={group}><span>{group}</span><strong>{Object.entries(specs).slice(0, 2).map(([key, value]) => `${key}: ${value}`).join(' · ')}</strong></div>)}</div>
