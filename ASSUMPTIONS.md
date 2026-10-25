@@ -19,3 +19,5 @@
 - Automatic spec lookup can only be as good as its free sources. Wikipedia and the saved library cover older phones; recent phones need the optional `GEMINI_API_KEY` or pasted specifications. Specifications are never published until the owner ticks the confirmation.
 - The backup reminder is stored per browser (localStorage); it cannot know about backups taken on another device.
 - Two-factor sign-in uses Supabase Auth TOTP and is off until a person enables it. If Supabase cannot report the sign-in assurance level, the check lets the sign-in through rather than locking the owner out.
+- The repository migration includes a trigger (`phone_models_review_gate`) that refuses to save an "available" phone whose specifications are unconfirmed. Your live database does not enforce it (the first 13 phones were saved unconfirmed). If you re-create the database from the migration, saving a draft phone from the Add form will be rejected until the specifications are confirmed; tick the confirmation box in step 2.
+- Existing phones can be given a colour, and their specifications confirmed, from the pencil (Edit) button on their inventory row.

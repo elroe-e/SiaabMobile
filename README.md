@@ -132,7 +132,7 @@ Free-tier limits apply; when Google answers "busy", wait a minute or paste the s
 
 ## Two-factor sign-in (optional)
 
-Admin → Settings → **Two-factor sign-in** → *Turn on two-factor*. Scan the QR code with Google Authenticator, Microsoft Authenticator or Authy and enter the 6-digit code. From then on sign-in asks for a code after the password. Each person turns it on for their own account.
+Admin → Settings → **Two-factor sign-in** → *Turn on two-factor*. Scan the QR code with Google Authenticator, Microsoft Authenticator or Authy and enter the 6-digit code. From then on sign-in asks for a code after the password. The card is in the owner's Settings page, so it protects the owner account; staff accounts keep signing in with a password.
 
 Lost the phone? In the Supabase dashboard open **Authentication → Users**, pick the account and delete its authenticator factor; the account then signs in with just the password again.
 

@@ -8,7 +8,7 @@ import { ArrowLeft, ArrowRight, Camera, CircleDollarSign, PackagePlus, Pencil, R
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 type Role = 'owner' | 'staff'
-type RelatedModel = { name: string; slug: string; brands: { name: string } | { name: string }[] | null }
+type RelatedModel = { name: string; slug: string; specs_reviewed?: boolean; brands: { name: string } | { name: string }[] | null }
 type ModelRow = { id: string; name: string; slug: string; status: string; expected_date: string | null; expected_price_range: string | null; tagline: string; specs: Record<string, unknown>; spec_meta: Record<string, unknown>; specs_reviewed: boolean; brands: { name: string } | { name: string }[] | null }
 type VariantRow = { id: string; model_id: string; ram_gb: number; storage_gb: number; color_name: string; price: number; stock_count: number; low_stock_threshold: number; is_published: boolean; phone_models: RelatedModel | RelatedModel[] | null }
 type UsedRow = { id: string; model_id: string; ram_gb: number; storage_gb: number; color_name: string; grade: string; battery_health_pct: number | null; accessories: string; warranty_months: number; price: number; cost_price?: number | null; imei?: string | null; notes_internal?: string; status: string; is_published: boolean; reserved_until: string | null; sold_at: string | null; phone_models: RelatedModel | RelatedModel[] | null }
@@ -156,6 +156,9 @@ function UpdateInventoryModal({ role, target, onClose, onSave }: {
   const [price, setPrice] = useState(String(variant?.price ?? unit?.price ?? ''))
   const [threshold, setThreshold] = useState(String(variant?.low_stock_threshold ?? ''))
   const [published, setPublished] = useState(variant?.is_published ?? unit?.is_published ?? false)
+  const [colorName, setColorName] = useState(/^unspecified$/i.test(variant?.color_name ?? '') ? '' : variant?.color_name ?? '')
+  const [confirmSpecs, setConfirmSpecs] = useState(false)
+  const specsUnconfirmed = Boolean(variant || unit) && rel((variant ?? unit)!)?.specs_reviewed === false
   const [costPrice, setCostPrice] = useState(String(unit?.cost_price ?? ''))
   const [imei, setImei] = useState(unit?.imei ?? '')
   const [notes, setNotes] = useState(unit?.notes_internal ?? '')
@@ -169,9 +172,10 @@ function UpdateInventoryModal({ role, target, onClose, onSave }: {
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setBusy(true); setError('')
+    if ((variant || unit) && published && specsUnconfirmed && !confirmSpecs) { setBusy(false); setError('Confirm the phone specifications before publishing it.'); return }
     let body: Record<string, unknown>
-    if (variant) body = { type: 'variant', id: variant.id, stockCount: Number(stockCount), price: Number(price), lowStockThreshold: Number(threshold), isPublished: published }
-    else if (unit) body = { type: 'unit', id: unit.id, price: Number(price), isPublished: published, ...(role === 'owner' ? { costPrice: costPrice ? Number(costPrice) : null, imei: imei || null, notesInternal: notes } : {}) }
+    if (variant) body = { type: 'variant', id: variant.id, stockCount: Number(stockCount), price: Number(price), lowStockThreshold: Number(threshold), isPublished: published, ...(colorName.trim() && colorName.trim() !== variant.color_name ? { colorName: colorName.trim() } : {}), ...(confirmSpecs ? { confirmSpecs: true } : {}) }
+    else if (unit) body = { type: 'unit', id: unit.id, price: Number(price), isPublished: published, ...(confirmSpecs ? { confirmSpecs: true } : {}), ...(role === 'owner' ? { costPrice: costPrice ? Number(costPrice) : null, imei: imei || null, notesInternal: notes } : {}) }
     else if (model) {
       try { body = { type: 'model', id: model.id, expectedDate, expectedPriceRange, specs: JSON.parse(specs), specMeta: model.spec_meta, specsReviewed: reviewed } }
       catch { setBusy(false); setError('Specifications must be valid JSON.'); return }
@@ -186,14 +190,17 @@ function UpdateInventoryModal({ role, target, onClose, onSave }: {
       <form onSubmit={(event) => void submit(event)}>
         <div className="admin-form-grid">
           {variant && <>
+            <label className="admin-label full">Colour<input maxLength={50} value={colorName} onChange={(event) => setColorName(event.target.value)} placeholder="Black" /><small className="admin-inline-note">Customers see the colour but cannot choose it.</small></label>
             <label className="admin-label">Quantity in stock<input type="number" min="0" required value={stockCount} onChange={(event) => setStockCount(event.target.value)} /></label>
             <label className="admin-label">Price (ETB)<input type="number" min="1" step="0.01" required value={price} onChange={(event) => setPrice(event.target.value)} /></label>
             <label className="admin-label">Low-stock threshold<input type="number" min="0" required value={threshold} onChange={(event) => setThreshold(event.target.value)} /></label>
             <label className="admin-check"><input type="checkbox" checked={published} onChange={(event) => setPublished(event.target.checked)} /> Publish this variant</label>
+            {specsUnconfirmed && <label className="admin-check full"><input type="checkbox" checked={confirmSpecs} onChange={(event) => setConfirmSpecs(event.target.checked)} /> I have checked this phone’s specifications and they are correct.</label>}
           </>}
           {unit && <>
             <label className="admin-label">Price (ETB)<input type="number" min="1" step="0.01" required value={price} onChange={(event) => setPrice(event.target.value)} /></label>
             <label className="admin-check"><input type="checkbox" checked={published} onChange={(event) => setPublished(event.target.checked)} /> Publish this used unit</label>
+            {specsUnconfirmed && <label className="admin-check full"><input type="checkbox" checked={confirmSpecs} onChange={(event) => setConfirmSpecs(event.target.checked)} /> I have checked this phone’s specifications and they are correct.</label>}
             {role === 'owner' && <>
               <label className="admin-label">Cost price<input type="number" min="0" step="0.01" value={costPrice} onChange={(event) => setCostPrice(event.target.value)} /></label>
               <label className="admin-label">IMEI<input inputMode="numeric" pattern="[0-9]{14,16}" value={imei} onChange={(event) => setImei(event.target.value)} /></label>
