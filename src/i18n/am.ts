@@ -199,7 +199,7 @@ export const amharic: Record<string, string> = {
   "Your name": "ስምዎ",
   "Phone, Telegram or email": "ስልክ፣ ቴሌግራም ወይም ኢሜይል",
   "Send my request": "ጥያቄዬን ላክ",
-  "This opens WhatsApp so you can review the message before sending. We don’t store your details.": "ዋትስአፕ ይከፈታል፤ ከመላክዎ በፊት መልዕክቱን ማየት ይችላሉ። ዝርዝርዎን አናስቀምጥም።",
+  "This opens WhatsApp so you can review the message before sending. Your request is also saved so the team can follow up.": "ዋትስአፕ ይከፈታል፤ ከመላክዎ በፊት መልዕክቱን ማየት ይችላሉ። ቡድኑ እንዲከታተል ጥያቄዎ ደግሞ ይቀመጣል።",
 
   // Trade-in
   "GOODBYE OLD PHONE, HELLO NEXT": "ቻው የድሮ ስልክ፣ ሰላም አዲስ",

@@ -55,8 +55,8 @@ export async function GET(request: Request) {
     const type = url.searchParams.get('type') ?? 'all'
     const [models, variants, used, ownerUnits] = await Promise.all([
       supabase.from('phone_models').select('id,brand_id,name,slug,status,expected_date,expected_price_range,tagline,specs,spec_meta,specs_reviewed,created_at,brands(name)').order('updated_at', { ascending: false }),
-      type === 'used' ? Promise.resolve({ data: [], error: null }) : supabase.from('variants').select('*,phone_models(name,slug,brands(name))').order('created_at', { ascending: false }),
-      type === 'new' ? Promise.resolve({ data: [], error: null }) : supabase.from('used_units').select('id,model_id,ram_gb,storage_gb,color_name,grade,battery_health_pct,accessories,warranty_months,price,status,is_published,reserved_until,sold_at,created_at,phone_models(name,slug,brands(name))').order('created_at', { ascending: false }),
+      type === 'used' ? Promise.resolve({ data: [], error: null }) : supabase.from('variants').select('*,phone_models(name,slug,specs_reviewed,brands(name))').order('created_at', { ascending: false }),
+      type === 'new' ? Promise.resolve({ data: [], error: null }) : supabase.from('used_units').select('id,model_id,ram_gb,storage_gb,color_name,grade,battery_health_pct,accessories,warranty_months,price,status,is_published,reserved_until,sold_at,created_at,phone_models(name,slug,specs_reviewed,brands(name))').order('created_at', { ascending: false }),
       type === 'new' || profile.role !== 'owner' ? Promise.resolve({ data: [], error: null }) : supabase.from('admin_used_units').select('id,cost_price,imei,notes_internal'),
     ])
     const error = models.error ?? variants.error ?? used.error ?? ownerUnits.error
@@ -133,12 +133,22 @@ export async function POST(request: Request) {
 }
 
 const updateSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('variant'), id: z.string().uuid(), stockCount: z.number().int().min(0).optional(), price: z.number().positive().optional(), lowStockThreshold: z.number().int().min(0).optional(), isPublished: z.boolean().optional() }).strict(),
-  z.object({ type: z.literal('unit'), id: z.string().uuid(), price: z.number().positive().optional(), isPublished: z.boolean().optional(), accessories: z.string().max(200).optional(), warrantyMonths: z.number().int().min(0).max(120).optional(), costPrice: z.number().nonnegative().nullable().optional(), imei: z.string().regex(/^\d{14,16}$/).nullable().optional(), notesInternal: z.string().max(2000).optional() }).strict(),
+  z.object({ type: z.literal('variant'), id: z.string().uuid(), colorName: z.string().trim().min(1).max(50).optional(), confirmSpecs: z.boolean().optional(), stockCount: z.number().int().min(0).optional(), price: z.number().positive().optional(), lowStockThreshold: z.number().int().min(0).optional(), isPublished: z.boolean().optional() }).strict(),
+  z.object({ type: z.literal('unit'), id: z.string().uuid(), confirmSpecs: z.boolean().optional(), price: z.number().positive().optional(), isPublished: z.boolean().optional(), accessories: z.string().max(200).optional(), warrantyMonths: z.number().int().min(0).max(120).optional(), costPrice: z.number().nonnegative().nullable().optional(), imei: z.string().regex(/^\d{14,16}$/).nullable().optional(), notesInternal: z.string().max(2000).optional() }).strict(),
   z.object({ type: z.literal('model'), id: z.string().uuid(), tagline: z.string().max(240).optional(), expectedDate: z.string().max(80).optional(), expectedPriceRange: z.string().max(80).optional(), specs: z.record(z.string(), z.unknown()).optional(), specMeta: z.record(z.string(), z.unknown()).optional(), specsReviewed: z.boolean().optional() }).strict(),
 ])
 
 const deleteSchema = z.object({ type: z.enum(['model', 'variant', 'unit']), id: z.string().uuid() }).strict()
+
+type AdminClient = Awaited<ReturnType<typeof requireAdmin>>['supabase']
+
+/** Marks the phone model behind a variant or used unit as having reviewed specifications. Returns an error message or null. */
+async function confirmModelSpecs(supabase: AdminClient, table: 'variants' | 'used_units', id: string): Promise<string | null> {
+  const { data: row, error: lookupError } = await supabase.from(table).select('model_id').eq('id', id).maybeSingle()
+  if (lookupError || !row) return lookupError?.message ?? 'That item no longer exists.'
+  const { error } = await supabase.from('phone_models').update({ specs_reviewed: true }).eq('id', row.model_id)
+  return error?.message ?? null
+}
 
 export async function PATCH(request: Request) {
   const parsed = updateSchema.safeParse(await request.json().catch(() => null))
@@ -151,13 +161,24 @@ export async function PATCH(request: Request) {
     }
     let error: { message: string } | null
     if (input.type === 'variant') {
-      const values = { ...(input.stockCount !== undefined ? { stock_count: input.stockCount } : {}), ...(input.price !== undefined ? { price: input.price } : {}), ...(input.lowStockThreshold !== undefined ? { low_stock_threshold: input.lowStockThreshold } : {}), ...(input.isPublished !== undefined ? { is_published: input.isPublished } : {}) }
-      if (!Object.keys(values).length) return NextResponse.json({ error: 'No changes provided.' }, { status: 400 })
-      ;({ error } = await supabase.from('variants').update(values).eq('id', input.id))
+      const values = { ...(input.stockCount !== undefined ? { stock_count: input.stockCount } : {}), ...(input.price !== undefined ? { price: input.price } : {}), ...(input.lowStockThreshold !== undefined ? { low_stock_threshold: input.lowStockThreshold } : {}), ...(input.isPublished !== undefined ? { is_published: input.isPublished } : {}), ...(input.colorName !== undefined ? { color_name: input.colorName, color_hex: colorHex(input.colorName) } : {}) }
+      if (!Object.keys(values).length && !input.confirmSpecs) return NextResponse.json({ error: 'No changes provided.' }, { status: 400 })
+      if (input.confirmSpecs) {
+        const confirmed = await confirmModelSpecs(supabase, 'variants', input.id)
+        if (confirmed) return NextResponse.json({ error: confirmed }, { status: 400 })
+      }
+      if (Object.keys(values).length) ({ error } = await supabase.from('variants').update(values).eq('id', input.id))
+      else error = null
+      if (error?.message.includes('duplicate')) error = { message: 'Another variant of this phone already has that colour, RAM and storage.' }
     } else if (input.type === 'unit') {
       const values = { ...(input.price !== undefined ? { price: input.price } : {}), ...(input.isPublished !== undefined ? { is_published: input.isPublished } : {}), ...(input.accessories !== undefined ? { accessories: input.accessories } : {}), ...(input.warrantyMonths !== undefined ? { warranty_months: input.warrantyMonths } : {}), ...(input.costPrice !== undefined ? { cost_price: input.costPrice } : {}), ...(input.imei !== undefined ? { imei: input.imei } : {}), ...(input.notesInternal !== undefined ? { notes_internal: input.notesInternal } : {}) }
-      if (!Object.keys(values).length) return NextResponse.json({ error: 'No changes provided.' }, { status: 400 })
-      ;({ error } = await supabase.from('used_units').update(values).eq('id', input.id))
+      if (!Object.keys(values).length && !input.confirmSpecs) return NextResponse.json({ error: 'No changes provided.' }, { status: 400 })
+      if (input.confirmSpecs) {
+        const confirmed = await confirmModelSpecs(supabase, 'used_units', input.id)
+        if (confirmed) return NextResponse.json({ error: confirmed }, { status: 400 })
+      }
+      if (Object.keys(values).length) ({ error } = await supabase.from('used_units').update(values).eq('id', input.id))
+      else error = null
     } else {
       const values = { ...(input.tagline !== undefined ? { tagline: input.tagline } : {}), ...(input.expectedDate !== undefined ? { expected_date: input.expectedDate } : {}), ...(input.expectedPriceRange !== undefined ? { expected_price_range: input.expectedPriceRange } : {}), ...(input.specs !== undefined ? { specs: input.specs } : {}), ...(input.specMeta !== undefined ? { spec_meta: input.specMeta } : {}), ...(input.specsReviewed !== undefined ? { specs_reviewed: input.specsReviewed } : {}) }
       if (!Object.keys(values).length) return NextResponse.json({ error: 'No changes provided.' }, { status: 400 })
