@@ -20,8 +20,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug?: st
     if (phone) return {
       title: `${fullPhoneName(phone.brand, phone.model)}`,
       alternates,
-      description: `${phone.tagline} Check stock, ETB price, colors, storage, warranty and specifications at Siaab Mobile.`,
-      openGraph: { title: `${fullPhoneName(phone.brand, phone.model)} | Siaab Mobile`, description: phone.tagline, images: [phone.images[0] ?? '/og-image.svg'] },
+      description: `${fullPhoneName(phone.brand, phone.model)}: stock, ETB price, storage options, warranty and full specifications at Siaab Mobile.`,
+      openGraph: { title: `${fullPhoneName(phone.brand, phone.model)} | Siaab Mobile`, description: `${fullPhoneName(phone.brand, phone.model)} at Siaab Mobile.`, images: [phone.images[0] ?? '/og-image.svg'] },
     }
   }
   const titles: Record<string, string> = {

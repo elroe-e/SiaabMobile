@@ -7,8 +7,8 @@ export const createWhatsAppUrl = (message: string, number = shop.whatsapp[0]) =>
   return `https://wa.me/${normalizedNumber}?text=${encodeURIComponent(message)}`
 }
 
-export const phoneOrderMessage = (model: string, storage: string, color: string, price: string, link: string, storeName = shop.name) =>
-  `Hello ${storeName}, I’m interested in:\n${model} | ${storage} | ${color} | ${price}\nLink: ${link}`
+export const phoneOrderMessage = (model: string, storage: string, price: string, link: string, storeName = shop.name) =>
+  `Hello ${storeName}, I’m interested in:\n${model} | ${storage} | ${price}\nLink: ${link}`
 
 export const tradeInMessage = (phone: string, storage: string, answers: TradeInAnswers, result: TradeInEstimate, storeName = shop.name) => {
   const resultText = result.eligible ? `${result.min?.toLocaleString()}–${result.max?.toLocaleString()} ETB (estimate)` : 'Not eligible until unlocked'

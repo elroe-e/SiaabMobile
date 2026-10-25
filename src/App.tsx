@@ -13,6 +13,7 @@ import { defaultFilters, filterPhones, type CatalogFilters } from './lib/filters
 import { estimateTradeIn } from './lib/tradeIn'
 import { formatPrice, formatStorage, fullPhoneName } from './lib/format'
 import { createWhatsAppUrl, phoneOrderMessage, tradeInMessage } from './lib/whatsapp'
+import { visibleColors } from './lib/colors'
 import { useSpecMode } from './hooks/useSpecMode'
 import { useDebounce } from './hooks/useDebounce'
 import type { TradeInAnswers, TradeInEstimate, UpcomingPhone } from './types'
@@ -47,7 +48,7 @@ function StorefrontApp({ initialPhones }: { initialPhones: Phone[] }) {
       : titles[pathname] ?? 'Page not found | Siaab Mobile'
     const description = document.querySelector<HTMLMetaElement>('meta[name="description"]')
     if (description) description.content = currentPhone
-      ? `${currentPhone.tagline} View price, color and storage options, warranty information, and full specifications at Siaab Mobile.`
+      ? `${fullPhoneName(currentPhone.brand, currentPhone.model)}: price, storage options, warranty information and full specifications at Siaab Mobile.`
       : 'Browse trusted smartphones, compare simple or advanced specifications and get an in-store trade-in estimate at Siaab Mobile in Addis Ababa.'
     let canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]')
     if (!canonical) {
@@ -180,14 +181,12 @@ function PhoneDetail() {
   const phone = phones.find((item) => item.slug === slug)
   const [mode, setMode] = useSpecMode()
   const [storage, setStorage] = useState(phone?.storageOptions[0]?.gb ?? 128)
-  const [color, setColor] = useState(phone?.colors[0]?.name ?? '')
   const [gallery, setGallery] = useState(0)
   const [zoom, setZoom] = useState(false)
   const touchStart = useRef<number | null>(null)
   useEffect(() => {
     if (!phone) return
     setStorage(phone.storageOptions[0]?.gb ?? 128)
-    setColor(phone.colors[0]?.name ?? '')
     setGallery(0)
   }, [phone?.id])
   useEffect(() => {
@@ -219,16 +218,16 @@ function PhoneDetail() {
   const selected = phone.storageOptions.find((option) => option.gb === storage) ?? phone.storageOptions[0]!
   const orderMessage = phone.stock === 'out_of_stock'
     ? `Hello ${shop.name}, please let me know when ${fullPhoneName(phone.brand, phone.model)} is back in stock.`
-    : phoneOrderMessage(`${fullPhoneName(phone.brand, phone.model)}`, formatStorage(selected.gb), color, formatPrice(selected.price), `${shop.siteUrl}${pathname}`, shop.name)
+    : phoneOrderMessage(`${fullPhoneName(phone.brand, phone.model)}`, formatStorage(selected.gb), formatPrice(selected.price), `${shop.siteUrl}${pathname}`, shop.name)
   const orderUrl = createWhatsAppUrl(orderMessage, shop.whatsapp[0])
   const similar = phones.filter((item) => item.id !== phone.id && (item.brand === phone.brand || Math.abs(item.price - phone.price) < 16000)).slice(0, 4)
-  const productSchema = { '@context': 'https://schema.org', '@type': 'Product', name: `${fullPhoneName(phone.brand, phone.model)}`, description: phone.tagline, brand: { '@type': 'Brand', name: phone.brand }, offers: { '@type': 'Offer', priceCurrency: 'ETB', price: selected.price, availability: phone.stock === 'out_of_stock' ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock' } }
+  const productSchema = { '@context': 'https://schema.org', '@type': 'Product', name: `${fullPhoneName(phone.brand, phone.model)}`, description: `${fullPhoneName(phone.brand, phone.model)} available at Siaab Mobile in Addis Ababa.`, brand: { '@type': 'Brand', name: phone.brand }, offers: { '@type': 'Offer', priceCurrency: 'ETB', price: selected.price, availability: phone.stock === 'out_of_stock' ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock' } }
   return <div className="container page-container detail-page">
     <script type="application/ld+json">{JSON.stringify(productSchema)}</script>
     <nav className="breadcrumbs" aria-label="Breadcrumb"><Link href="/">Home</Link><span>/</span><Link href="/phones">Phones</Link><span>/</span><span>{fullPhoneName(phone.brand, phone.model)}</span></nav>
     <div className="detail-layout"><div className="gallery-column"><button className="gallery-main" type="button" onClick={() => setZoom(true)} onTouchStart={(event) => { touchStart.current = event.touches[0]?.clientX ?? null }} onTouchEnd={(event) => { const end = event.changedTouches[0]?.clientX; if (touchStart.current !== null && end !== undefined && Math.abs(end - touchStart.current) > 45) setGallery((current) => (current + (end < touchStart.current! ? 1 : phone.images.length - 1)) % phone.images.length); touchStart.current = null }} aria-label="Enlarge phone photo; swipe to change photos"><img src={phone.images[gallery]} alt={`${fullPhoneName(phone.brand, phone.model)}, view ${gallery + 1}`} /><span className="zoom-hint">Click to zoom <ArrowUpRight size={14} /></span></button><div className="gallery-thumbnails">{phone.images.map((image, index) => <button key={image} className={gallery === index ? 'selected' : ''} type="button" onClick={() => setGallery(index)} aria-label={`Show photo ${index + 1}`} aria-pressed={gallery === index}><img src={image} alt="" /></button>)}</div></div>
-      <div className="detail-info"><span className="eyebrow">{phone.brand.toUpperCase()} · {phone.condition === 'new' ? 'BRAND NEW' : 'REFURBISHED'}</span><h1>{phone.model}</h1><p className="detail-tagline">{phone.tagline}</p><div className="detail-badges">{phone.badges.map((badge) => <span key={badge} className="pill">{badge}</span>)}<StockBadge stock={phone.stock} /></div><div className="detail-price"><strong>{formatPrice(selected.price)}</strong>{phone.oldPrice && <del>{formatPrice(phone.oldPrice)}</del>}<span>Price confirmed in store</span></div>
-        <div className="detail-option"><div className="option-heading"><strong>Color</strong><span>{color}</span></div><div className="color-options">{phone.colors.map((item) => <button key={item.name} className={`color-swatch ${color === item.name ? 'selected' : ''}`} style={{ '--swatch': item.hex } as CSSProperties} type="button" onClick={() => setColor(item.name)} aria-label={item.name} aria-pressed={color === item.name}><span /></button>)}</div></div>
+      <div className="detail-info"><span className="eyebrow">{phone.brand.toUpperCase()} · {phone.condition === 'new' ? 'BRAND NEW' : 'REFURBISHED'}</span><h1>{phone.model}</h1><div className="detail-badges">{phone.badges.map((badge) => <span key={badge} className="pill">{badge}</span>)}<StockBadge stock={phone.stock} /></div><div className="detail-price"><strong>{formatPrice(selected.price)}</strong>{phone.oldPrice && <del>{formatPrice(phone.oldPrice)}</del>}<span>Price confirmed in store</span></div>
+        {visibleColors(phone.colors).length > 0 && <div className="detail-option"><div className="option-heading"><strong>Available colors</strong></div><ul className="color-list">{visibleColors(phone.colors).map((item) => <li key={item.name}><span className="color-dot" style={{ '--swatch': item.hex } as CSSProperties} aria-hidden="true" />{item.name}</li>)}</ul></div>}
         <div className="detail-option"><div className="option-heading"><strong>Storage</strong><span>Choose capacity</span></div><div className="storage-options">{phone.storageOptions.map((option) => <button key={option.gb} className={`storage-option ${storage === option.gb ? 'selected' : ''}`} type="button" onClick={() => setStorage(option.gb)} aria-pressed={storage === option.gb}><span>{formatStorage(option.gb)}</span><strong>{formatPrice(option.price)}</strong></button>)}</div></div>
         <div className="detail-warranty"><ShieldCheck size={18} /><span><strong>{phone.warrantyMonths}-month warranty</strong><small>Included with your purchase</small></span><Check size={16} /></div>
         <div className="detail-actions"><a href={orderUrl} target="_blank" rel="noreferrer" className={`button button-whatsapp button-large ${phone.stock === 'out_of_stock' ? 'button-disabled' : ''}`}><MessageCircle size={18} />{phone.stock === 'out_of_stock' ? 'Ask when it’s back' : 'Order on WhatsApp'}</a><a href={`tel:${shop.phones[0]}`} className="button button-outline button-large"><PhoneCall size={17} />Call the shop</a></div>

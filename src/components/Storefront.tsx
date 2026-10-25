@@ -154,7 +154,7 @@ export function PhoneCard({ phone, mode = 'simple', compact = false }: { phone: 
   const { shop } = useStoreData()
   const orderMessage = phone.stock === 'out_of_stock'
     ? `Hello ${shop.name}, please let me know when ${fullPhoneName(phone.brand, phone.model)} is back in stock.`
-    : phoneOrderMessage(`${fullPhoneName(phone.brand, phone.model)}`, formatStorage(phone.storageOptions[0]?.gb ?? 128), phone.colors[0]?.name ?? 'Any color', formatPrice(phone.price), `${shop.siteUrl}/phones/${phone.slug}`, shop.name)
+    : phoneOrderMessage(`${fullPhoneName(phone.brand, phone.model)}`, formatStorage(phone.storageOptions[0]?.gb ?? 128), formatPrice(phone.price), `${shop.siteUrl}/phones/${phone.slug}`, shop.name)
   const order = createWhatsAppUrl(orderMessage, shop.whatsapp[0])
   return (
     <article className={`phone-card ${compact ? 'phone-card-compact' : ''}`}>
@@ -165,7 +165,6 @@ export function PhoneCard({ phone, mode = 'simple', compact = false }: { phone: 
       </Link>
       <div className="phone-card-content">
         <div className="phone-card-title"><div><span className="phone-brand">{phone.brand}</span><h3><Link href={`/phones/${phone.slug}`}>{phone.model}</Link></h3></div><StockBadge stock={phone.stock} /></div>
-        <p className="phone-tagline">{phone.tagline}</p>
         <KeySpecs phone={phone} mode={mode} />
         <div className="phone-card-footer"><div><span className="price-label">From</span><strong>{formatPrice(phone.price)}</strong>{phone.oldPrice && <del>{formatPrice(phone.oldPrice)}</del>}</div><div className="phone-card-actions"><Link href={`/phones/${phone.slug}`} className="button button-light button-small">Details</Link><a href={order} target="_blank" rel="noreferrer" className={`button button-whatsapp button-small ${phone.stock === 'out_of_stock' ? 'button-disabled' : ''}`} aria-label={phone.stock === 'out_of_stock' ? `Ask when ${phone.model} will be available` : `Ask about ${phone.model} on WhatsApp`}><MessageCircle size={15} />{phone.stock === 'out_of_stock' ? 'Notify' : 'WhatsApp'}</a></div></div>
       </div>
