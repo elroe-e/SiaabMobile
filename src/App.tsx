@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft, ArrowRight, ArrowUpRight, Check, LayoutGrid, ChevronDown, CircleHelp,
   Clock3, CreditCard, MapPin, MessageCircle, PackageCheck, PhoneCall, Search, ShieldCheck, Smartphone,
-  Sparkles, Tag, X,
+  Sparkles, X,
 } from 'lucide-react'
 import { phones } from './data/phones'
 import { defaultFilters, filterPhones, type CatalogFilters } from './lib/filters'
@@ -15,6 +15,7 @@ import { formatPrice, formatStorage, fullPhoneName } from './lib/format'
 import { createWhatsAppUrl, phoneOrderMessage, tradeInMessage } from './lib/whatsapp'
 import { visibleColors } from './lib/colors'
 import { brandLogo, brandSummary } from './lib/brandLogos'
+import { HeroCarousel, newestPhones } from './components/HeroCarousel'
 import { productAssurances } from './data/assurances'
 import { useSpecMode } from './hooks/useSpecMode'
 import { useDebounce } from './hooks/useDebounce'
@@ -93,12 +94,7 @@ function Home() {
         <div className="hero-buttons"><Link href="/phones" className="button button-primary">{t("Find your phone")} <ArrowRight size={17} /></Link><Link href="/trade-in" className="button button-outline">{t("Get trade-in value")} <ArrowUpRight size={16} /></Link><Link href="/brands" className="button button-outline">{t("Shop by brand")} <LayoutGrid size={16} /></Link></div>
         <div className="hero-proof"><span className="hero-proof-mark"><MapPin size={14} /></span><span><strong>{t("Good people, good phones.")}</strong><small>{t("Local advice in the heart of Addis.")}</small></span></div>
       </div>
-      <div className="hero-art" aria-label={t("A selection of smartphones available at Siaab Mobile")}>
-        <div className="hero-art-glow" /><div className="hero-card-back"><img src={phones[1]?.images[1]} alt="" /></div><div className="hero-card-main"><img src={phones[0]?.images[0]} alt="Featured Samsung Galaxy smartphone" /><div className="hero-art-label"><span>{t("THE EVERYDAY ICON")}</span><strong>{t("Meet your next.")}</strong></div></div>
-        <div className="hero-float hero-float-warranty"><span className="icon-circle green"><ShieldCheck size={17} /></span><span><strong>{t("12 month")}</strong><small>{t("warranty included")}</small></span></div>
-        <div className="hero-float hero-float-price"><span className="icon-circle amber"><Tag size={17} /></span><span><strong>{t("Good value.")}</strong><small>{t("Good as new options")}</small></span></div>
-        <div className="hero-index">01 <span>/</span> 04</div>
-      </div>
+      <HeroCarousel phones={newestPhones(phones)} />
     </section>
     <div className="container"><TrustStrip /></div>
     <section className="section container featured-section"><SectionHeading eyebrow="A FEW GOOD PICKS" title={t("Popular right now")} text="Thoughtful picks for every kind of upgrade." link="View all phones" to="/phones" /><div className="home-spec-control"><span>{t("See specs in")}</span><SpecSwitcher mode={mode} onChange={setMode} /></div><div className="phone-grid">{featured.map((phone) => <PhoneCard key={phone.id} phone={phone} mode={mode} />)}</div></section>
@@ -193,6 +189,7 @@ function PhoneDetail() {
   const [gallery, setGallery] = useState(0)
   const [zoom, setZoom] = useState(false)
   const touchStart = useRef<number | null>(null)
+  const zoomTouch = useRef<number | null>(null)
   useEffect(() => {
     if (!phone) return
     setStorage(phone.storageOptions[0]?.gb ?? 128)
@@ -246,7 +243,7 @@ function PhoneDetail() {
     <section className="detail-specs-section"><div className="spec-heading-row"><div><span className="eyebrow">{t("GET TO KNOW IT")}</span><h2>{t("All the details.")}</h2><p>{t("Pick the level of detail that’s right for you.")}</p></div><SpecSwitcher mode={mode} onChange={setMode} /></div>{mode === 'simple' ? <div className="detail-simple-specs"><KeySpecs phone={phone} mode="simple" /></div> : <AdvancedSpecs phone={phone} />}</section>
     {similar.length > 0 && <section className="section similar-section"><SectionHeading eyebrow="YOU MIGHT ALSO LIKE" title={t("A few close contenders")} /><div className="phone-grid">{similar.map((item) => <PhoneCard key={item.id} phone={item} mode={mode} />)}</div></section>}
     <div className="mobile-sticky-order"><div><span>{formatPrice(selected.price)}</span><small>{phone.model}</small></div><a href={orderUrl} target="_blank" rel="noreferrer" className="button button-whatsapp"><MessageCircle size={17} />{t("WhatsApp")}</a></div>
-    {zoom && <div className="zoom-overlay" role="dialog" aria-modal="true" aria-label={`${phone.model} image viewer`} onClick={() => setZoom(false)}><button className="zoom-close" aria-label={t("Close image viewer")} onClick={() => setZoom(false)}><X /></button><button className="zoom-arrow zoom-prev" aria-label={t("Previous image")} onClick={(event) => { event.stopPropagation(); setGallery((gallery + phone.images.length - 1) % phone.images.length) }}><ArrowLeft /></button><img src={phone.images[gallery]} alt={`${fullPhoneName(phone.brand, phone.model)}`} onClick={(event) => event.stopPropagation()} /><button className="zoom-arrow zoom-next" aria-label={t("Next image")} onClick={(event) => { event.stopPropagation(); setGallery((gallery + 1) % phone.images.length) }}><ArrowRight /></button></div>}
+    {zoom && <div className="zoom-overlay" role="dialog" aria-modal="true" aria-label={`${phone.model} image viewer`} onClick={() => setZoom(false)} onTouchStart={(event) => { zoomTouch.current = event.touches[0]?.clientX ?? null }} onTouchEnd={(event) => { const start = zoomTouch.current; const end = event.changedTouches[0]?.clientX; zoomTouch.current = null; if (start === null || end === undefined || Math.abs(end - start) < 40) return; setGallery((current) => (current + (end < start ? 1 : phone.images.length - 1)) % phone.images.length) }}><button className="zoom-close" aria-label={t("Close image viewer")} onClick={() => setZoom(false)}><X /></button><button className="zoom-arrow zoom-prev" aria-label={t("Previous image")} onClick={(event) => { event.stopPropagation(); setGallery((gallery + phone.images.length - 1) % phone.images.length) }}><ArrowLeft /></button><img src={phone.images[gallery]} alt={`${fullPhoneName(phone.brand, phone.model)}`} onClick={(event) => event.stopPropagation()} /><button className="zoom-arrow zoom-next" aria-label={t("Next image")} onClick={(event) => { event.stopPropagation(); setGallery((gallery + 1) % phone.images.length) }}><ArrowRight /></button>{phone.images.length > 1 && <div className="zoom-dots" aria-hidden="true">{phone.images.map((image, index) => <span key={image} className={index === gallery ? 'active' : ''} />)}</div>}</div>}
   </div>
 }
 
@@ -438,7 +435,7 @@ Contact: ${bookContact.trim()}`, shop.whatsapp[0])
             {step === 1 && <div className="trade-step-content"><span className="step-icon"><Smartphone size={20} /></span><h2>{t("First, what are we looking at?")}</h2><p>{t("Pick your current phone to get started.")}</p><label className="field-label">{t("Brand")}<select value={brand} onChange={(event) => { setBrand(event.target.value); setModel(''); setStorage(''); setQuery('') }}><option value="">{t("Choose a brand")}</option>{brands.map((item) => <option key={item}>{item}</option>)}<option value="Other">{t("Other brand")}</option></select></label>
               {brand && brand !== 'Other' && <><label className="field-label">{t("Model")}<input value={query || model} onChange={(event) => { const value = event.target.value; setQuery(value); setModel(models.includes(value) ? value : value === 'Other / not listed' ? '__other__' : ''); setStorage('') }} placeholder={t("Search or choose a model")} list="model-options" autoComplete="off" /><datalist id="model-options">{modelOptions.map((item) => <option key={item} value={item} />)}<option value="Other / not listed" /></datalist></label><div className="model-quick-picks">{modelOptions.slice(0, 4).map((item) => <button key={item} type="button" className={model === item ? 'selected' : ''} onClick={() => { setModel(item); setQuery(item); setStorage('') }}>{item}</button>)}<button type="button" className={isOther ? 'selected' : ''} onClick={() => { setModel('__other__'); setQuery(''); setStorage('') }}>{t("Other / not listed")}</button></div></>}
               {(brand === 'Other' || isOther) && <div className="not-listed-note"><CircleHelp size={17} /><span>{t("That’s okay! Our team can still help. We’ll ask for a few details to prepare a manual quote.")}</span></div>}
-              {brand && model && !isOther && <label className="field-label">{t("Storage")}<select value={storage} onChange={(event) => setStorage(event.target.value)}><option value="">{t("Choose storage")}</option>{tradeInValues.filter((item) => item.brand === brand && item.model === model).map((item) => <option key={item.storageGb} value={item.storageGb}>{item.storageGb} {t("GB")}</option>)}{!tradeInValues.some((item) => item.brand === brand && item.model === model) && <option value="128">{t("128 GB")}</option>}</select></label>}
+              {brand && model && !isOther && <label className="field-label">{t("Storage")}<select value={storage} onChange={(event) => setStorage(event.target.value)}><option value="">{t("Choose storage")}</option>{tradeInValues.filter((item) => item.brand === brand && item.model === model).sort((left, right) => left.storageGb - right.storageGb).map((item) => <option key={item.storageGb} value={item.storageGb}>{formatStorage(item.storageGb)}</option>)}{!tradeInValues.some((item) => item.brand === brand && item.model === model) && <option value="128">{t("128 GB")}</option>}</select></label>}
               {error && <p className="form-error" role="alert">{error}</p>}
               <button type="button" className="button button-primary button-full trade-next" onClick={() => { if (brand === 'Other') { setMode('manual'); return } if (model === 'Other / not listed') setModel('__other__'); next() }}>{t("Continue")} <ArrowRight size={17} /></button>
             </div>}

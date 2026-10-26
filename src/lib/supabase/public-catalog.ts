@@ -6,6 +6,7 @@ import type { Phone } from '../../types'
 
 type PublicModel = {
   id: string
+  created_at?: string
   brand: string
   name: string
   slug: string
@@ -91,7 +92,7 @@ function toPhone(model: PublicModel, variant: PublicVariant, photos: PublicModel
     images: imageSet,
     badges: [],
     popular: variant.stock_count,
-    createdAt: model.id,
+    createdAt: model.created_at ?? '',
     tradeInEligible: true,
     fiveG: model.specs.fiveG === true,
     ram: variant.ram_gb,
