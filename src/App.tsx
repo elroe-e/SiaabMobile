@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type C
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
-  ArrowLeft, ArrowRight, ArrowUpRight, Check, ChevronDown, CircleHelp,
+  ArrowLeft, ArrowRight, ArrowUpRight, Check, LayoutGrid, ChevronDown, CircleHelp,
   Clock3, CreditCard, MapPin, MessageCircle, PackageCheck, PhoneCall, Search, ShieldCheck, Smartphone,
   Sparkles, Tag, X,
 } from 'lucide-react'
@@ -14,6 +14,7 @@ import { estimateTradeIn } from './lib/tradeIn'
 import { formatPrice, formatStorage, fullPhoneName } from './lib/format'
 import { createWhatsAppUrl, phoneOrderMessage, tradeInMessage } from './lib/whatsapp'
 import { visibleColors } from './lib/colors'
+import { brandLogo, brandSummary } from './lib/brandLogos'
 import { productAssurances } from './data/assurances'
 import { useSpecMode } from './hooks/useSpecMode'
 import { useDebounce } from './hooks/useDebounce'
@@ -43,6 +44,7 @@ function StorefrontApp({ initialPhones }: { initialPhones: Phone[] }) {
       '/trade-in': 'Trade in your phone | Siaab Mobile',
       '/about': 'Our story | Siaab Mobile',
       '/contact': 'Visit or contact us | Siaab Mobile',
+      '/brands': 'Shop by brand | Siaab Mobile',
     }
     const slug = pathname.startsWith('/phones/') ? pathname.split('/').at(-1) : undefined
     const currentPhone = phoneData.find((phone) => phone.slug === slug)
@@ -68,6 +70,7 @@ function StorefrontApp({ initialPhones }: { initialPhones: Phone[] }) {
           : pathname === '/trade-in' ? <TradeIn />
             : pathname === '/about' ? <About />
               : pathname === '/contact' ? <Contact />
+                : pathname === '/brands' ? <Brands />
                 : <NotFound />
   return <PhoneContext.Provider value={phoneData}><Header /><main id="main-content">{page}</main><Footer /><FloatingWhatsApp /></PhoneContext.Provider>
 }
@@ -87,7 +90,7 @@ function Home() {
       <div className="hero-copy"><span className="eyebrow"><span className="eyebrow-dot" /> {t("YOUR NEXT PHONE, FOUND")}</span>
         <h1>{t("A good phone.")}<br />{t("A")} <em>{t("great")}</em> {t("feeling.")}</h1>
         <p>{t("Find the right device, get honest advice, and make every upgrade a little easier. Right here in Addis.")}</p>
-        <div className="hero-buttons"><Link href="/phones" className="button button-primary">{t("Find your phone")} <ArrowRight size={17} /></Link><Link href="/trade-in" className="button button-outline">{t("Get trade-in value")} <ArrowUpRight size={16} /></Link></div>
+        <div className="hero-buttons"><Link href="/phones" className="button button-primary">{t("Find your phone")} <ArrowRight size={17} /></Link><Link href="/trade-in" className="button button-outline">{t("Get trade-in value")} <ArrowUpRight size={16} /></Link><Link href="/brands" className="button button-outline">{t("Shop by brand")} <LayoutGrid size={16} /></Link></div>
         <div className="hero-proof"><span className="hero-proof-mark"><MapPin size={14} /></span><span><strong>{t("Good people, good phones.")}</strong><small>{t("Local advice in the heart of Addis.")}</small></span></div>
       </div>
       <div className="hero-art" aria-label={t("A selection of smartphones available at Siaab Mobile")}>
@@ -472,6 +475,23 @@ function About() {
     <section className="story-section"><div><span className="eyebrow">{t("WHY WE’RE HERE")}</span><h2>{t("A friendly face for your next upgrade.")}</h2></div><div className="story-copy"><p>{t("Phones are how we connect, create and get through the day. But choosing one can be overwhelming. We started Siaab Mobile to make the experience feel more human: useful guidance, carefully chosen devices and a real person ready to help.")}</p><p>{t("We’re proud to be part of the Megenagna neighborhood. Whether you’re shopping for a first smartphone, replacing a well-loved device or curious about a trade-in, you’ll find us ready to listen.")}</p><a href={shop.mapUrl} target="_blank" rel="noreferrer" className="text-link">{t("Come meet us in person")} <ArrowUpRight size={16} /></a></div></section>
     <section className="values-grid"><article><span className="value-icon"><ShieldCheck /></span><span className="eyebrow">{t("01 · GOOD ADVICE")}</span><h3>{t("Honest, always.")}</h3><p>{t("Clear answers about condition, price and warranty. If we don’t know, we’ll say so.")}</p></article><article><span className="value-icon"><PackageCheck /></span><span className="eyebrow">{t("02 · CAREFULLY CHOSEN")}</span><h3>{t("Good phones, checked.")}</h3><p>{t("We take care with our selection and help you confirm details before you buy.")}</p></article><article><span className="value-icon"><MessageCircle /></span><span className="eyebrow">{t("03 · HERE TO HELP")}</span><h3>{t("Support that stays.")}</h3><p>{t("Our relationship doesn’t end at checkout. Come back, call or message us any time.")}</p></article></section>
     <section className="story-bottom"><div><span className="eyebrow">{t("YOUR NEXT CHAPTER STARTS HERE")}</span><h2>{t("Come in curious.")}<br />{t("Leave feeling sure.")}</h2></div><div><p>{t("We’re at Megenagna Marathon Building, first floor, room 34. Come see what feels right.")}</p><Link href="/contact" className="button button-light">{t("Plan your visit")} <ArrowRight size={16} /></Link></div></section>
+  </div>
+}
+
+function Brands() {
+  const t = useT()
+  const phones = usePhoneData()
+  const brands = brandSummary(phones)
+  return <div className="container page-container brands-page">
+    <div className="page-intro"><div><span className="eyebrow">{t("SHOP BY BRAND")}</span><h1>{t("Pick a brand.")}</h1><p>{t("Every brand we have in the shop right now. Tap one to see its phones.")}</p></div></div>
+    {brands.length ? <ul className="brand-grid" aria-label={t("Brands")}>{brands.map(({ brand, count }) => {
+      const logo = brandLogo(brand)
+      return <li key={brand}><Link href={`/phones?brand=${encodeURIComponent(brand)}`} className="brand-tile">
+        <span className="brand-tile-logo" aria-hidden="true">{logo ? <svg viewBox="0 0 24 24" role="presentation"><path d={logo.path} fill={logo.color} /></svg> : <span className="brand-tile-letter">{brand.charAt(0).toUpperCase()}</span>}</span>
+        <strong>{brand}</strong>
+        <small>{count} {t(count === 1 ? 'phone' : 'phones')}</small>
+      </Link></li>
+    })}</ul> : <div className="empty-state"><h2>{t("No phones found. Yet.")}</h2><Link href="/phones" className="button button-primary">{t("All phones")}</Link></div>}
   </div>
 }
 
