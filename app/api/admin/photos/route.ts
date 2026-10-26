@@ -107,7 +107,7 @@ export async function DELETE(request: Request) {
   try {
     const { supabase } = await requireAdmin()
     const table = parsed.data.kind === 'model' ? 'model_photos' : 'used_unit_photos'
-    const { data: photo, error: readError } = await supabase.from(table).select('id,path,model_id,unit_id').eq('id', parsed.data.id).maybeSingle()
+    const { data: photo, error: readError } = await supabase.from(table).select(parsed.data.kind === 'model' ? 'id,path,model_id' : 'id,path,unit_id').eq('id', parsed.data.id).maybeSingle<{ id: string; path: string; model_id?: string; unit_id?: string }>()
     if (readError) return NextResponse.json({ error: readError.message }, { status: 500 })
     if (!photo) return NextResponse.json({ error: 'Photo not found.' }, { status: 404 })
     const { error: deleteRowError } = await supabase.from(table).delete().eq('id', photo.id)

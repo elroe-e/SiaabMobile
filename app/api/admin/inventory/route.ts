@@ -23,7 +23,7 @@ const variantSchema = z.object({
   colorName: z.string().trim().min(1).max(50),
   colorHex: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#777777'),
   price: z.number().positive(),
-  oldPrice: z.number().positive().optional(),
+  oldPrice: z.preprocess((value) => value === '' || value === null ? undefined : value, z.number().positive().optional()),
   stockCount: z.number().int().min(0),
   lowStockThreshold: z.number().int().min(0).default(2),
 })
