@@ -88,3 +88,11 @@ describe('update inventory API', () => {
     expect((await PATCH(patchRequest({ type: 'variant', id: variantId }))).status).toBe(400)
   })
 })
+
+describe('stale add-phone forms', () => {
+  it('accepts a blank previous price instead of failing with "expected number"', async () => {
+    const response = await POST(request({ ...base, variant: { ...base.variant, colorName: 'Black', oldPrice: '' } }))
+    expect(response.status).toBe(201)
+    expect(state.rpcCalls[0]).toMatchObject({ p_variant: { oldPrice: null } })
+  })
+})
