@@ -33,6 +33,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug?: st
     'trade-in': 'Trade in your phone',
     about: 'Our story',
     contact: 'Visit or contact us',
+    brands: 'Shop by brand',
   }
   return { title: titles[slug.join('/')] ?? 'Page not found', alternates }
 }
@@ -41,7 +42,7 @@ function LoadingStorefront() {
   return <main className="container page-container" aria-busy="true"><p>Loading Siaab Mobile…</p></main>
 }
 
-const knownPages = new Set(['', 'phones', 'upcoming', 'trade-in', 'about', 'contact'])
+const knownPages = new Set(['', 'phones', 'upcoming', 'trade-in', 'about', 'contact', 'brands'])
 
 export default async function StorefrontPage({ params }: { params: Promise<{ slug?: string[] }> }) {
   const { slug = [] } = await params

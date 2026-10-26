@@ -112,6 +112,14 @@ export const amharic: Record<string, string> = {
   "Can you deliver?": "ታደርሳላችሁ?",
   "Contact us on WhatsApp to confirm current delivery options and charges for your area.": "ለአካባቢዎ የአሁኑን የማድረስ አማራጮችና ክፍያ ለማረጋገጥ በዋትስአፕ ያግኙን።",
 
+  // Brands
+  "Shop by brand": "በብራንድ ይግዙ",
+  "SHOP BY BRAND": "በብራንድ ይግዙ",
+  "Pick a brand.": "ብራንድ ይምረጡ።",
+  "Every brand we have in the shop right now. Tap one to see its phones.": "አሁን በሱቃችን ያሉ ብራንዶች በሙሉ። ስልኮቹን ለማየት አንዱን ይንኩ።",
+  "Brands": "ብራንዶች",
+  "phone": "ስልክ",
+
   // Catalog
   "Refine your search": "ፍለጋዎን ያጥሩ",
   "Clear all": "ሁሉንም አጽዳ",

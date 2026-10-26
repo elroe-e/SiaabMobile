@@ -842,3 +842,20 @@ p { color: var(--muted); line-height: 1.72; }
 .lang-toggle { min-width: 44px; height: 37px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--white); color: var(--ink); font-size: 13px; font-weight: 700; cursor: pointer; transition: transform .16s var(--ease-out), background .16s ease; }
 .lang-toggle:active { transform: scale(.96); }
 @media (hover: hover) and (pointer: fine) { .lang-toggle:hover { background: var(--blue-pale); } }
+.brand-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 8px 0 0; padding: 0; list-style: none; }
+@media (min-width: 640px) { .brand-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .brand-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 18px; } }
+.brand-tile { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 16px; border: 1px solid var(--line); border-radius: 18px; background: var(--white); text-align: center; transition: transform .16s var(--ease-out), box-shadow .2s ease, border-color .2s ease; }
+.brand-tile:active { transform: scale(.97); }
+@media (hover: hover) and (pointer: fine) { .brand-tile:hover { transform: translateY(-3px); border-color: #c9d6ef; box-shadow: var(--shadow-soft); } }
+.brand-tile-logo { width: 58%; max-width: 92px; aspect-ratio: 1; display: grid; place-items: center; margin-bottom: 4px; border-radius: 16px; background: #f4f6fa; }
+.brand-tile-logo svg { width: 72%; height: 72%; }
+.brand-tile-letter { color: var(--blue); font: 800 clamp(26px, 6vw, 36px) var(--font-manrope), Manrope, sans-serif; }
+.brand-tile strong { color: var(--ink); font-size: 15px; font-weight: 700; }
+.brand-tile small { color: var(--muted); font-size: 12px; }
+@media (max-width: 640px) {
+  .hero-buttons { display: grid; grid-template-columns: 1fr 1fr; }
+  .hero-buttons .button-primary { grid-column: 1 / -1; }
+}
+@media (prefers-reduced-motion: reduce) { .brand-tile:hover, .brand-tile:active { transform: none; } }
+.catalog-results { min-width: 0; }
