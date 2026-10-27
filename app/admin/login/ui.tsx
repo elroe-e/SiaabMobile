@@ -1,5 +1,6 @@
 'use client'
 
+import { BrandMark } from '../../../src/components/BrandMark'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { LockKeyhole, Mail, Smartphone } from 'lucide-react'
@@ -124,7 +125,7 @@ export function AdminLogin() {
   return <main className="admin-login-page">
     <aside className="admin-login-aside">
       <Link href="/" className="admin-brand">
-        <span className="brand-mark">S</span>
+        <BrandMark />
         <span><span className="brand-name">siaab<span className="brand-accent">.</span></span><span className="admin-brand-sub">Store management</span></span>
       </Link>
       <div className="admin-login-copy">

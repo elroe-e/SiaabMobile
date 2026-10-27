@@ -1,5 +1,6 @@
 'use client'
 
+import { BrandMark } from '../../src/components/BrandMark'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { ArrowUpRight, BadgeDollarSign, Boxes, ClipboardList, LayoutDashboard, LogOut, Settings2, ShieldCheck } from 'lucide-react'
@@ -44,7 +45,7 @@ export function AdminShell({ children, name, role }: { children: ReactNode; name
   return <div className="admin-shell">
     <aside className="admin-sidebar">
       <Link href="/admin" className="admin-brand">
-        <span className="brand-mark">S</span>
+        <BrandMark />
         <span><span className="brand-name">siaab<span className="brand-accent">.</span></span><span className="admin-brand-sub">Store management</span></span>
       </Link>
       {nav('admin-nav')}

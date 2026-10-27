@@ -3,10 +3,12 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  ArrowUpRight, BatteryCharging, Camera, Check, ChevronDown, Cpu, HardDrive, Menu, MessageCircle, Share2,
+  ArrowUpRight, BatteryCharging, Camera, Check, ChevronDown, Cpu, HardDrive, Menu, MessageCircle, Moon, Share2, Sun,
   Monitor, PhoneCall, ShieldCheck, Smartphone, X,
 } from 'lucide-react'
 import { useStoreData } from '../context/StoreDataContext'
+import { BrandMark } from './BrandMark'
+import { THEME_COOKIE, type Theme } from '../lib/theme'
 import { formatPrice, formatStorage, fullPhoneName } from '../lib/format'
 import { createWhatsAppUrl, phoneOrderMessage } from '../lib/whatsapp'
 import type { Phone, SpecMode } from '../types'
@@ -20,9 +22,22 @@ const navLinks = [
   { label: 'Contact', to: '/contact' },
 ]
 
+function ThemeToggle() {
+  const t = useT()
+  const [theme, setTheme] = useState<Theme | null>(null)
+  useEffect(() => { setTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light') }, [])
+  const toggle = () => {
+    const next: Theme = theme === 'dark' ? 'light' : 'dark'
+    document.documentElement.setAttribute('data-theme', next)
+    try { document.cookie = `${THEME_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax` } catch { /* cookies blocked: lasts until reload */ }
+    setTheme(next)
+  }
+  return <button type="button" className="theme-toggle" onClick={toggle} aria-label={theme === 'dark' ? t("Switch to light theme") : t("Switch to dark theme")} aria-pressed={theme === 'dark'}>{theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}</button>
+}
+
 function LanguageToggle() {
   const { lang, setLang } = useLanguage()
-  return <button type="button" className="lang-toggle" onClick={() => setLang(lang === 'am' ? 'en' : 'am')} aria-label={lang === 'am' ? 'English (EN)' : 'አማርኛ (Amharic)'}>{lang === 'am' ? 'EN' : 'አማ'}</button>
+  return <button type="button" className="lang-toggle" onClick={() => setLang(lang === 'am' ? 'en' : 'am')} aria-label={lang === 'am' ? 'EN: switch to English' : 'አማ: ወደ አማርኛ ቀይር (Amharic)'}>{lang === 'am' ? 'EN' : 'አማ'}</button>
 }
 
 export function Header() {
@@ -76,7 +91,7 @@ export function Header() {
     <header className="site-header">
       <div className="header-inner">
         <Link href="/" className="brand-lockup" aria-label={t("siaabmobile home")}>
-          <span className="brand-mark"><Smartphone size={19} strokeWidth={2.4} /></span>
+          <BrandMark />
           <span className="brand-name">{t("siaab")}<span>{t("mobile")}</span></span>
         </Link>
         <nav className="desktop-nav" aria-label={t("Main navigation")}>
@@ -85,6 +100,7 @@ export function Header() {
         <div className="header-actions">
           <Link href="/trade-in" className="button button-primary button-small">{t("Trade in")} <ArrowUpRight size={15} /></Link>
           <LanguageToggle />
+          <ThemeToggle />
           <a href={whatsapp} target="_blank" rel="noreferrer" className="whatsapp-icon" aria-label={t("Chat with Siaab Mobile on WhatsApp")}><MessageCircle size={19} /></a>
           <button ref={menuButtonRef} type="button" className="mobile-menu-button" aria-label={open ? t("Close menu") : t("Open menu")} aria-expanded={open} aria-controls="mobile-nav-dialog" onClick={() => setOpen(!open)}>{open ? <X /> : <Menu />}</button>
         </div>
@@ -149,7 +165,7 @@ export function Footer() {
     <footer className="site-footer">
       <div className="container footer-main">
         <div className="footer-brand">
-          <Link href="/" className="brand-lockup"><span className="brand-mark"><Smartphone size={18} /></span><span className="brand-name">{t("siaab")}<span>{t("mobile")}</span></span></Link>
+          <Link href="/" className="brand-lockup"><BrandMark /><span className="brand-name">{t("siaab")}<span>{t("mobile")}</span></span></Link>
           <p>{t("A better way to find your next phone. Good advice, trusted devices, right here in Addis.")}</p>
         </div>
         <div className="footer-column"><h3>{t("Explore")}</h3><Link href="/phones">{t("Shop phones")}</Link><Link href="/upcoming">{t("Coming soon")}</Link><Link href="/trade-in">{t("Trade-in estimate")}</Link></div>

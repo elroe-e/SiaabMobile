@@ -145,3 +145,9 @@ The storefront has an English / አማርኛ switch in the header (remembered in
 - Lines under the price on phone pages: [`src/data/assurances.ts`](./src/data/assurances.ts). Change them to match the shop's real policy.
 - Backup reminder: the admin overview and settings show how long ago this browser last downloaded **Export everything**.
 - Share button on phone pages uses the phone's share sheet where available, with WhatsApp, Telegram and copy-link as fallbacks.
+
+## Logo, home-screen app and dark theme
+
+- **Logo:** drawn as SVG in [`src/components/BrandMark.tsx`](./src/components/BrandMark.tsx) and [`public/logo.svg`](./public/logo.svg). App icons live in `public/icons/` (192 px, 512 px, a maskable 512 px for Android and a 180 px Apple touch icon).
+- **Home-screen name:** [`app/manifest.ts`](./app/manifest.ts) names the installed app "SiaabMobile". A shortcut added before this change keeps its old name; remove it and add it again from Chrome.
+- **Dark theme:** the moon/sun button in the header switches themes and the choice is remembered. Without a choice the site follows the phone's own dark-mode setting. Dark colours for each rule are generated at build time by [`postcss-dark-theme.cjs`](./postcss-dark-theme.cjs) from the normal stylesheet; the shared dark colours and a few hand-picked overrides are at the end of `src/index.css`. The admin panel always stays light.
