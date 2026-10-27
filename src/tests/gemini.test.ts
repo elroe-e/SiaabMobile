@@ -41,3 +41,28 @@ describe('Gemini model selection', () => {
     await expect(geminiProvider.fetch({ brand: 'Honor', model: 'Honor 400' })).rejects.toThrow(/rejected the AI key/)
   })
 })
+
+describe('Gemini quota handling', () => {
+  it('falls back to a request without web search when the search quota is exhausted', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-key')
+    vi.stubEnv('GEMINI_MODEL', 'gemini-3.0-flash')
+    const bodies: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => {
+      const body = String(init?.body ?? '')
+      bodies.push(body)
+      if (body.includes('google_search')) return new Response(JSON.stringify({ error: { message: 'Quota exceeded for grounding', status: 'RESOURCE_EXHAUSTED' } }), { status: 429 })
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"batteryMah":5000,"sourceUrls":[]}' }] } }] }))
+    }))
+    const result = await geminiProvider.fetch({ brand: 'OnePlus', model: 'OnePlus 15' })
+    expect(result.specs).toMatchObject({ batteryMah: 5000 })
+    expect(bodies).toHaveLength(2)
+    expect(bodies[1]).not.toContain('google_search')
+  })
+
+  it('reports Google\'s own reason when every attempt is refused', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-key')
+    vi.stubEnv('GEMINI_MODEL', 'gemini-3.0-flash')
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: { message: 'Quota exceeded for this service,\n limit: 0' } }), { status: 429 })))
+    await expect(geminiProvider.fetch({ brand: 'OnePlus', model: 'OnePlus 15' })).rejects.toThrow('limit reached: Quota exceeded for this service, limit: 0')
+  })
+})
