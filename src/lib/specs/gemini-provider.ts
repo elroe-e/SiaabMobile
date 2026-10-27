@@ -35,7 +35,10 @@ const API = 'https://generativelanguage.googleapis.com/v1beta'
 const DEFAULT_MODEL = 'gemini-flash-latest'
 let discoveredModel: string | null = null
 let groundingUnavailable = false
-const REQUEST_TIMEOUT_MS = 40_000
+// Google's free tier is sometimes slow or overloaded, so the lookup gets one overall time budget.
+const TOTAL_BUDGET_MS = 60_000
+const SEARCH_TIMEOUT_MS = 25_000
+const PLAIN_TIMEOUT_MS = 30_000
 
 type ListedModel = { name: string; supportedGenerationMethods?: string[] }
 
@@ -65,57 +68,90 @@ async function googleReason(response: Response): Promise<string> {
   return message.replace(/\s+/g, ' ').slice(0, 220)
 }
 
+type Attempt = { model: string; search: boolean; result: string; ms: number }
+
+/** One line per attempt, e.g. "gemini-flash-latest + web search: HTTP 429 quota (0.4 s)". */
+export const describeAttempts = (attempts: Attempt[]) =>
+  attempts.map((item) => `${item.model}${item.search ? ' + web search' : ''}: ${item.result} (${(item.ms / 1000).toFixed(1)} s)`).join('; ')
+
+const isKeyProblem = (response: Response | null) => response !== null && [400, 401, 403].includes(response.status)
+
+/** Resets remembered model choices; used by tests. */
+export function resetGeminiState() { discoveredModel = null; groundingUnavailable = false }
+
 export const geminiProvider: SpecProvider = {
   name: 'ai',
   async fetch({ brand, model }) {
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) return { specs: {}, sourceUrls: [] }
     const override = process.env.GEMINI_MODEL?.trim()
-    const request = async (modelName: string, grounded: boolean, thinking = false) => {
+    const started = Date.now()
+    const remaining = () => TOTAL_BUDGET_MS - (Date.now() - started)
+    const attempts: Attempt[] = []
+
+    const call = async (modelName: string, search: boolean, thinking: boolean): Promise<Response | 'timeout'> => {
       try {
         return await fetch(`${API}/models/${modelName}:generateContent`, {
           method: 'POST',
           headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
-          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+          signal: AbortSignal.timeout(Math.max(1_000, Math.min(search ? SEARCH_TIMEOUT_MS : PLAIN_TIMEOUT_MS, remaining()))),
           body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: `${grounded ? 'Use Google Search grounding to verify' : 'From what you reliably know, give'} specifications for ${brand} ${model}. Return strict JSON only. Use null for anything you cannot verify. Never guess. Include sourceUrls from authoritative public sources. Match this object shape: {"display":{"sizeInches":number|null,"resolution":{"width":number,"height":number}|null,"type":string|null,"refreshRateHz":number|null,"brightnessNits":number|null,"protection":string|null}|null,"chipset":string|null,"cpu":string|null,"gpu":string|null,"rearCamera":[{"name":string,"megapixels":number|null,"details":string|null}]|null,"frontCamera":{"megapixels":number|null,"details":string|null}|null,"batteryMah":number|null,"chargingWatts":number|null,"fiveG":boolean|null,"nfc":boolean|null,"esim":boolean|null,"dimensionsMm":{"height":number,"width":number,"depth":number}|null,"weightGrams":number|null,"waterRating":string|null,"os":string|null,"ramGb":number|null,"storageGb":number|null,"sourceUrls":[string]}.` }] }],
-            ...(grounded ? { tools: [{ google_search: {} }] } : {}),
+            contents: [{ role: 'user', parts: [{ text: `${search ? 'Use Google Search grounding to verify' : 'From what you reliably know, give'} specifications for ${brand} ${model}. Return strict JSON only. Use null for anything you cannot verify. Never guess. Include sourceUrls from authoritative public sources. Match this object shape: {"display":{"sizeInches":number|null,"resolution":{"width":number,"height":number}|null,"type":string|null,"refreshRateHz":number|null,"brightnessNits":number|null,"protection":string|null}|null,"chipset":string|null,"cpu":string|null,"gpu":string|null,"rearCamera":[{"name":string,"megapixels":number|null,"details":string|null}]|null,"frontCamera":{"megapixels":number|null,"details":string|null}|null,"batteryMah":number|null,"chargingWatts":number|null,"fiveG":boolean|null,"nfc":boolean|null,"esim":boolean|null,"dimensionsMm":{"height":number,"width":number,"depth":number}|null,"weightGrams":number|null,"waterRating":string|null,"os":string|null,"ramGb":number|null,"storageGb":number|null,"sourceUrls":[string]}.` }] }],
+            ...(search ? { tools: [{ google_search: {} }] } : {}),
             // Thinking makes newer models take 20+ seconds; a spec sheet does not need it.
             generationConfig: { temperature: 0, maxOutputTokens: 2048, ...(thinking ? {} : { thinkingConfig: { thinkingBudget: 0 } }) },
           }),
         })
       } catch (error) {
-        if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) throw new Error(`Google AI took longer than ${REQUEST_TIMEOUT_MS / 1000} seconds to answer. Try again, or paste the specifications.`, { cause: error })
+        if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) return 'timeout'
         throw error
       }
     }
-    // Some models refuse to switch thinking off; ask again with thinking allowed.
-    const send = async (modelName: string, grounded: boolean) => {
-      const first = await request(modelName, grounded)
-      if (first.status === 400 && /thinking/i.test(await googleReason(first.clone()))) return request(modelName, grounded, true)
-      return first
+
+    const attempt = async (modelName: string, search: boolean): Promise<Response | null> => {
+      const begun = Date.now()
+      let response = await call(modelName, search, false)
+      // Some models refuse to switch thinking off; ask again with thinking allowed.
+      if (response !== 'timeout' && response.status === 400 && /thinking/i.test(await googleReason(response.clone()))) response = await call(modelName, search, true)
+      const ms = Date.now() - begun
+      if (response === 'timeout') { attempts.push({ model: modelName, search, result: 'no answer in time', ms }); return null }
+      attempts.push({ model: modelName, search, result: response.ok ? 'answered' : `HTTP ${response.status} ${(await googleReason(response.clone())).slice(0, 80)}`, ms })
+      return response
     }
-    const grounded = !groundingUnavailable
+
     let modelName = override || discoveredModel || DEFAULT_MODEL
-    let response = await send(modelName, grounded)
-    // Google retires model names; when ours is gone, ask which models this key can use and retry once.
-    if (response.status === 404 && !override) {
-      const picked = pickFlashModel(await listModels(apiKey))
-      if (picked && picked !== modelName) { discoveredModel = picked; modelName = picked; response = await send(modelName, grounded) }
+    let alternative: string | null | undefined
+    const otherModel = async () => {
+      if (override) return null
+      if (alternative === undefined) alternative = pickFlashModel(await listModels(apiKey))
+      return alternative && alternative !== modelName ? alternative : null
     }
-    // The free tier may not include Google Search grounding; remember that and use plain requests.
-    if (response.status === 429 && grounded) {
-      groundingUnavailable = true
-      response = await send(modelName, false)
+    const keepGoing = (response: Response | null) => !response?.ok && !isKeyProblem(response) && remaining() > 5_000
+
+    let response: Response | null = null
+    if (!groundingUnavailable) {
+      response = await attempt(modelName, true)
+      // Google retires model names; when ours is gone, switch to a current one.
+      if (response?.status === 404) { const next = await otherModel(); if (next) { discoveredModel = modelName = next; response = await attempt(modelName, true) } }
+      // The free tier may not include web search; remember that and use plain requests from now on.
+      if (response?.status === 429) groundingUnavailable = true
     }
-    if (response.status === 429 && !override) {
-      const picked = pickFlashModel(await listModels(apiKey))
-      if (picked && picked !== modelName) { discoveredModel = picked; modelName = picked; response = await send(modelName, false) }
+    if (keepGoing(response)) {
+      response = await attempt(modelName, false)
+      if (response?.status === 404) { const next = await otherModel(); if (next) { discoveredModel = modelName = next; response = await attempt(modelName, false) } }
     }
-    if (response.status === 404) throw new Error(`Google AI model "${modelName}" was not found. Set GEMINI_MODEL to a current model name.`)
-    if (response.status === 400 || response.status === 403) throw new Error(`Google rejected the AI key (${await googleReason(response)}). Check GEMINI_API_KEY in the hosting environment variables.`)
-    if (response.status === 429) throw new Error(`Google AI limit reached: ${await googleReason(response)} Try again later or paste specs.`)
-    if (!response.ok) throw new Error(`Gemini lookup returned HTTP ${response.status}: ${await googleReason(response)}`)
+    if (keepGoing(response)) {
+      const next = await otherModel()
+      if (next) { response = await attempt(next, false); if (response?.ok) discoveredModel = next }
+    }
+
+    const tried = ` Attempts: ${describeAttempts(attempts)}.`
+    if (!response) throw new Error(`Google AI did not answer in time. Try again, or paste the specifications.${tried}`)
+    if (isKeyProblem(response)) throw new Error(`Google rejected the AI key (${await googleReason(response)}). Check GEMINI_API_KEY in the hosting environment variables.${tried}`)
+    if (response.status === 404) throw new Error(`Google AI model "${modelName}" was not found. Set GEMINI_MODEL to a current model name.${tried}`)
+    if (response.status === 429) throw new Error(`Google AI limit reached: ${await googleReason(response)} Try again later or paste specs.${tried}`)
+    if (response.status === 503) throw new Error(`Google AI is overloaded right now. Try again in a few minutes, or paste the specifications.${tried}`)
+    if (!response.ok) throw new Error(`Gemini lookup returned HTTP ${response.status}: ${await googleReason(response)}${tried}`)
     const data = await response.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] }
     const text = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? '').join('') ?? ''
     let json: unknown

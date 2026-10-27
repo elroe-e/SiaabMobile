@@ -7,7 +7,7 @@ import { preparePhoto, uploadPhoto } from './photo-tools'
 type Role = 'owner' | 'staff'
 type Kind = 'new' | 'used' | 'upcoming'
 type Specs = Record<string, unknown>
-type ProviderInfo = { name: string; status: string; foundFields: number; message?: string }
+type ProviderInfo = { name: string; status: string; foundFields: number; error?: string }
 type CreateResult = { modelId?: string; unitId?: string }
 
 const providerLabel: Record<string, string> = { database: 'Saved library', wikipedia: 'Wikipedia', ai: 'Google AI', pasted: 'Pasted text' }
@@ -193,6 +193,7 @@ export function CreateInventoryModal({ role, onClose, onCreate, onFinished }: {
             {!lookupBusy && rows.length > 0 && <dl className="admin-spec-list">{rows.map(([name, value]) => <div key={name}><dt>{name}</dt><dd>{value}</dd></div>)}</dl>}
             {!lookupBusy && rows.length === 0 && <p className="admin-inline-note">No specifications were found online for this phone yet. You can paste them below, or save and customers will see "Not specified".</p>}
             {providers.length > 0 && <p className="admin-inline-note">{providers.map((provider) => `${providerLabel[provider.name] ?? provider.name}: ${provider.status === 'ok' || provider.foundFields > 0 ? `${provider.foundFields} found` : provider.status}`).join(' · ')}</p>}
+            {providers.filter((provider) => provider.status === 'failed' && provider.error).map((provider) => <p key={provider.name} className="admin-inline-note">{providerLabel[provider.name] ?? provider.name}: {provider.error}</p>)}
             {lookupError && <p className="admin-inline-note" role="alert">{lookupError}</p>}
             <div className="admin-toolbar-left"><button type="button" className="button button-outline button-small" disabled={lookupBusy} onClick={() => void lookup()}>Search again</button></div>
           </div>

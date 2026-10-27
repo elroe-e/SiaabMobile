@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { geminiProvider, pickFlashModel } from '../lib/specs/gemini-provider'
+import { geminiProvider, pickFlashModel, resetGeminiState } from '../lib/specs/gemini-provider'
 
 const listing = { models: [
   { name: 'models/gemini-2.0-flash', supportedGenerationMethods: ['generateContent'] },
@@ -10,7 +10,7 @@ const listing = { models: [
   { name: 'models/text-embedding-004', supportedGenerationMethods: ['embedContent'] },
 ] }
 
-afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs() })
+afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); resetGeminiState() })
 
 describe('Gemini model selection', () => {
   it('prefers the newest stable Flash model and skips lite, image and embedding models', () => {
@@ -88,6 +88,30 @@ describe('Gemini speed settings', () => {
     vi.stubEnv('GEMINI_API_KEY', 'test-key')
     vi.stubEnv('GEMINI_MODEL', 'gemini-9.0-flash')
     vi.stubGlobal('fetch', vi.fn(async () => { throw Object.assign(new Error('aborted'), { name: 'TimeoutError' }) }))
-    await expect(geminiProvider.fetch({ brand: 'Test', model: 'Phone' })).rejects.toThrow(/took longer than 40 seconds/)
+    await expect(geminiProvider.fetch({ brand: 'Test', model: 'Phone' })).rejects.toThrow(/did not answer in time.*no answer in time/)
+  })
+})
+
+describe('Gemini attempt plan', () => {
+  it('moves from an overloaded model to another current model and reports every attempt on failure', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-key')
+    const seen: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.endsWith('/models?pageSize=200')) return new Response(JSON.stringify(listing))
+      const search = String(init?.body).includes('google_search')
+      seen.push(`${url.split('/models/')[1]?.split(':')[0]}${search ? '+search' : ''}`)
+      if (url.includes('gemini-3.0-flash') && !search) return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"chipset":"X","sourceUrls":[]}' }] } }] }))
+      return new Response(JSON.stringify({ error: { message: 'This model is currently experiencing high demand.' } }), { status: 503 })
+    }))
+    const result = await geminiProvider.fetch({ brand: 'Honor', model: 'Honor 400' })
+    expect(result.specs).toMatchObject({ chipset: 'X' })
+    expect(seen).toEqual(['gemini-flash-latest+search', 'gemini-flash-latest', 'gemini-3.0-flash'])
+  })
+
+  it('lists each attempt with its result and time when everything fails', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-key')
+    vi.stubEnv('GEMINI_MODEL', 'gemini-3.0-flash')
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: { message: 'high demand' } }), { status: 503 })))
+    await expect(geminiProvider.fetch({ brand: 'Honor', model: 'Honor 400' })).rejects.toThrow(/overloaded right now.*Attempts: gemini-3\.0-flash \+ web search: HTTP 503 high demand \(\d+\.\d s\); gemini-3\.0-flash: HTTP 503/)
   })
 })
