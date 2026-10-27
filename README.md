@@ -126,7 +126,7 @@ Wikipedia rarely has articles for phones released in the last year, so for new m
 
 1. Create a free key at Google AI Studio (aistudio.google.com) with the shop's Google account.
 2. Add it to the host's environment variables as `GEMINI_API_KEY` (SmarterASP.NET: Node.js project → **Environment Variables**), then redeploy. Never put the key in the repository or in chat.
-3. Optional: `GEMINI_MODEL` overrides the model name (default `gemini-2.5-flash`). If lookups start failing with an HTTP 404, Google has retired that name; set a current one.
+3. The app picks Google's newest stable Flash model on its own (it starts with `gemini-flash-latest` and, if Google has retired a name, asks which models your key can use). Set `GEMINI_MODEL` only to force a specific model.
 
 Free-tier limits apply; when Google answers "busy", wait a minute or paste the specifications instead. AI-found specifications are suggestions: always check them before ticking the confirmation box.
 

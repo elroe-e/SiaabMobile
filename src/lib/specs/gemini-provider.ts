@@ -31,15 +31,40 @@ export function extractJson(text: string): string {
   return start >= 0 && end > start ? candidate.slice(start, end + 1) : candidate
 }
 
+const API = 'https://generativelanguage.googleapis.com/v1beta'
+const DEFAULT_MODEL = 'gemini-flash-latest'
+let discoveredModel: string | null = null
+
+type ListedModel = { name: string; supportedGenerationMethods?: string[] }
+
+/** Picks the newest stable Flash model the key can use, so a retired model name never breaks the lookup. */
+export function pickFlashModel(models: ListedModel[]): string | null {
+  const usable = models
+    .filter((item) => (item.supportedGenerationMethods ?? []).includes('generateContent'))
+    .map((item) => item.name.replace(/^models\//, ''))
+  const version = (id: string) => Number(/gemini-(\d+(?:\.\d+)?)/.exec(id)?.[1] ?? 0)
+  const stable = usable.filter((id) => /^gemini-\d+(\.\d+)?-flash$/.test(id)).sort((a, b) => version(b) - version(a))
+  if (stable[0]) return stable[0]
+  if (usable.includes(DEFAULT_MODEL)) return DEFAULT_MODEL
+  return usable.filter((id) => /flash/.test(id) && !/lite|image|tts|audio|live|embed|vision/.test(id)).sort((a, b) => version(b) - version(a))[0] ?? null
+}
+
+async function listModels(apiKey: string): Promise<ListedModel[]> {
+  const response = await fetch(`${API}/models?pageSize=200`, { headers: { 'x-goog-api-key': apiKey }, signal: AbortSignal.timeout(8_000), cache: 'no-store' })
+  if (!response.ok) return []
+  const data = await response.json() as { models?: ListedModel[] }
+  return data.models ?? []
+}
+
 export const geminiProvider: SpecProvider = {
   name: 'ai',
   async fetch({ brand, model }) {
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) return { specs: {}, sourceUrls: [] }
-    const modelName = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash'
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`, {
+    const override = process.env.GEMINI_MODEL?.trim()
+    const request = (modelName: string) => fetch(`${API}/models/${modelName}:generateContent`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
       signal: AbortSignal.timeout(24_000),
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: `Use Google Search grounding to verify specifications for ${brand} ${model}. Return strict JSON only. Use null for anything you cannot verify. Never guess. Include sourceUrls from authoritative public sources. Match this object shape: {"display":{"sizeInches":number|null,"resolution":{"width":number,"height":number}|null,"type":string|null,"refreshRateHz":number|null,"brightnessNits":number|null,"protection":string|null}|null,"chipset":string|null,"cpu":string|null,"gpu":string|null,"rearCamera":[{"name":string,"megapixels":number|null,"details":string|null}]|null,"frontCamera":{"megapixels":number|null,"details":string|null}|null,"batteryMah":number|null,"chargingWatts":number|null,"fiveG":boolean|null,"nfc":boolean|null,"esim":boolean|null,"dimensionsMm":{"height":number,"width":number,"depth":number}|null,"weightGrams":number|null,"waterRating":string|null,"os":string|null,"ramGb":number|null,"storageGb":number|null,"sourceUrls":[string]}.` }] }],
@@ -47,6 +72,15 @@ export const geminiProvider: SpecProvider = {
         generationConfig: { temperature: 0 },
       }),
     })
+    let modelName = override || discoveredModel || DEFAULT_MODEL
+    let response = await request(modelName)
+    // Google retires model names; when ours is gone, ask which models this key can use and retry once.
+    if (response.status === 404 && !override) {
+      const picked = pickFlashModel(await listModels(apiKey))
+      if (picked && picked !== modelName) { discoveredModel = picked; modelName = picked; response = await request(modelName) }
+    }
+    if (response.status === 404) throw new Error(`Google AI model "${modelName}" was not found. Set GEMINI_MODEL to a current model name.`)
+    if (response.status === 400 || response.status === 403) throw new Error('Google rejected the AI key. Check GEMINI_API_KEY in the hosting environment variables.')
     if (response.status === 429) throw new Error('AI lookup is busy, try again or paste specs.')
     if (!response.ok) throw new Error(`Gemini lookup returned HTTP ${response.status}.`)
     const data = await response.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] }
