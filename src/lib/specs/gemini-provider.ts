@@ -34,6 +34,8 @@ export function extractJson(text: string): string {
 const API = 'https://generativelanguage.googleapis.com/v1beta'
 const DEFAULT_MODEL = 'gemini-flash-latest'
 let discoveredModel: string | null = null
+let groundingUnavailable = false
+const REQUEST_TIMEOUT_MS = 40_000
 
 type ListedModel = { name: string; supportedGenerationMethods?: string[] }
 
@@ -69,30 +71,46 @@ export const geminiProvider: SpecProvider = {
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) return { specs: {}, sourceUrls: [] }
     const override = process.env.GEMINI_MODEL?.trim()
-    const request = (modelName: string, grounded = true) => fetch(`${API}/models/${modelName}:generateContent`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
-      signal: AbortSignal.timeout(24_000),
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: `${grounded ? 'Use Google Search grounding to verify' : 'From what you reliably know, give'} specifications for ${brand} ${model}. Return strict JSON only. Use null for anything you cannot verify. Never guess. Include sourceUrls from authoritative public sources. Match this object shape: {"display":{"sizeInches":number|null,"resolution":{"width":number,"height":number}|null,"type":string|null,"refreshRateHz":number|null,"brightnessNits":number|null,"protection":string|null}|null,"chipset":string|null,"cpu":string|null,"gpu":string|null,"rearCamera":[{"name":string,"megapixels":number|null,"details":string|null}]|null,"frontCamera":{"megapixels":number|null,"details":string|null}|null,"batteryMah":number|null,"chargingWatts":number|null,"fiveG":boolean|null,"nfc":boolean|null,"esim":boolean|null,"dimensionsMm":{"height":number,"width":number,"depth":number}|null,"weightGrams":number|null,"waterRating":string|null,"os":string|null,"ramGb":number|null,"storageGb":number|null,"sourceUrls":[string]}.` }] }],
-        ...(grounded ? { tools: [{ google_search: {} }] } : {}),
-        generationConfig: { temperature: 0 },
-      }),
-    })
+    const request = async (modelName: string, grounded: boolean, thinking = false) => {
+      try {
+        return await fetch(`${API}/models/${modelName}:generateContent`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: `${grounded ? 'Use Google Search grounding to verify' : 'From what you reliably know, give'} specifications for ${brand} ${model}. Return strict JSON only. Use null for anything you cannot verify. Never guess. Include sourceUrls from authoritative public sources. Match this object shape: {"display":{"sizeInches":number|null,"resolution":{"width":number,"height":number}|null,"type":string|null,"refreshRateHz":number|null,"brightnessNits":number|null,"protection":string|null}|null,"chipset":string|null,"cpu":string|null,"gpu":string|null,"rearCamera":[{"name":string,"megapixels":number|null,"details":string|null}]|null,"frontCamera":{"megapixels":number|null,"details":string|null}|null,"batteryMah":number|null,"chargingWatts":number|null,"fiveG":boolean|null,"nfc":boolean|null,"esim":boolean|null,"dimensionsMm":{"height":number,"width":number,"depth":number}|null,"weightGrams":number|null,"waterRating":string|null,"os":string|null,"ramGb":number|null,"storageGb":number|null,"sourceUrls":[string]}.` }] }],
+            ...(grounded ? { tools: [{ google_search: {} }] } : {}),
+            // Thinking makes newer models take 20+ seconds; a spec sheet does not need it.
+            generationConfig: { temperature: 0, maxOutputTokens: 2048, ...(thinking ? {} : { thinkingConfig: { thinkingBudget: 0 } }) },
+          }),
+        })
+      } catch (error) {
+        if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) throw new Error(`Google AI took longer than ${REQUEST_TIMEOUT_MS / 1000} seconds to answer. Try again, or paste the specifications.`, { cause: error })
+        throw error
+      }
+    }
+    // Some models refuse to switch thinking off; ask again with thinking allowed.
+    const send = async (modelName: string, grounded: boolean) => {
+      const first = await request(modelName, grounded)
+      if (first.status === 400 && /thinking/i.test(await googleReason(first.clone()))) return request(modelName, grounded, true)
+      return first
+    }
+    const grounded = !groundingUnavailable
     let modelName = override || discoveredModel || DEFAULT_MODEL
-    let response = await request(modelName)
+    let response = await send(modelName, grounded)
     // Google retires model names; when ours is gone, ask which models this key can use and retry once.
     if (response.status === 404 && !override) {
       const picked = pickFlashModel(await listModels(apiKey))
-      if (picked && picked !== modelName) { discoveredModel = picked; modelName = picked; response = await request(modelName) }
+      if (picked && picked !== modelName) { discoveredModel = picked; modelName = picked; response = await send(modelName, grounded) }
     }
-    // The free tier may not include Google Search grounding; a plain request usually still works.
-    if (response.status === 429) {
-      response = await request(modelName, false)
-      if (response.status === 429 && !override) {
-        const picked = pickFlashModel(await listModels(apiKey))
-        if (picked && picked !== modelName) { discoveredModel = picked; modelName = picked; response = await request(modelName, false) }
-      }
+    // The free tier may not include Google Search grounding; remember that and use plain requests.
+    if (response.status === 429 && grounded) {
+      groundingUnavailable = true
+      response = await send(modelName, false)
+    }
+    if (response.status === 429 && !override) {
+      const picked = pickFlashModel(await listModels(apiKey))
+      if (picked && picked !== modelName) { discoveredModel = picked; modelName = picked; response = await send(modelName, false) }
     }
     if (response.status === 404) throw new Error(`Google AI model "${modelName}" was not found. Set GEMINI_MODEL to a current model name.`)
     if (response.status === 400 || response.status === 403) throw new Error(`Google rejected the AI key (${await googleReason(response)}). Check GEMINI_API_KEY in the hosting environment variables.`)

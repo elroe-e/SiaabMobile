@@ -66,3 +66,28 @@ describe('Gemini quota handling', () => {
     await expect(geminiProvider.fetch({ brand: 'OnePlus', model: 'OnePlus 15' })).rejects.toThrow('limit reached: Quota exceeded for this service, limit: 0')
   })
 })
+
+describe('Gemini speed settings', () => {
+  it('asks with thinking switched off, and retries with it on if the model refuses', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-key')
+    vi.stubEnv('GEMINI_MODEL', 'gemini-9.0-flash')
+    const bodies: Record<string, unknown>[] = []
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { generationConfig: Record<string, unknown> }
+      bodies.push(body.generationConfig)
+      if (body.generationConfig.thinkingConfig) return new Response(JSON.stringify({ error: { message: 'Thinking budget cannot be 0 for this model.' } }), { status: 400 })
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"batteryMah":4000,"sourceUrls":[]}' }] } }] }))
+    }))
+    const result = await geminiProvider.fetch({ brand: 'Test', model: 'Phone' })
+    expect(result.specs).toMatchObject({ batteryMah: 4000 })
+    expect(bodies[0]).toMatchObject({ thinkingConfig: { thinkingBudget: 0 } })
+    expect(bodies[1]).not.toHaveProperty('thinkingConfig')
+  })
+
+  it('turns a slow answer into a plain-words message', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-key')
+    vi.stubEnv('GEMINI_MODEL', 'gemini-9.0-flash')
+    vi.stubGlobal('fetch', vi.fn(async () => { throw Object.assign(new Error('aborted'), { name: 'TimeoutError' }) }))
+    await expect(geminiProvider.fetch({ brand: 'Test', model: 'Phone' })).rejects.toThrow(/took longer than 40 seconds/)
+  })
+})
