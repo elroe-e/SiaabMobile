@@ -51,7 +51,7 @@ export async function fetchSpecs(input: SpecProviderInput, options: FetchSpecsOp
     }
     statuses.push({ name: provider.name, status: 'running', foundFields: 0 })
     try {
-      const output = await withTimeout(provider.fetch(input), options.timeoutMs ?? (provider.name === 'ai' ? 55_000 : 10_000))
+      const output = await withTimeout(provider.fetch(input), options.timeoutMs ?? (provider.name === 'ai' ? 70_000 : 10_000))
       const safeOutput: PartialSpecs = {}
       const flagged = new Set<keyof NormalizedSpecs>()
       for (const [key, value] of Object.entries(output.specs)) {
