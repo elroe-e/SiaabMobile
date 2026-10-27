@@ -56,19 +56,26 @@ async function listModels(apiKey: string): Promise<ListedModel[]> {
   return data.models ?? []
 }
 
+/** Google's own explanation for a failed request, shortened; it never contains the key. */
+async function googleReason(response: Response): Promise<string> {
+  const body = await response.json().catch(() => null) as { error?: { message?: string; status?: string } } | null
+  const message = body?.error?.message ?? body?.error?.status ?? `HTTP ${response.status}`
+  return message.replace(/\s+/g, ' ').slice(0, 220)
+}
+
 export const geminiProvider: SpecProvider = {
   name: 'ai',
   async fetch({ brand, model }) {
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) return { specs: {}, sourceUrls: [] }
     const override = process.env.GEMINI_MODEL?.trim()
-    const request = (modelName: string) => fetch(`${API}/models/${modelName}:generateContent`, {
+    const request = (modelName: string, grounded = true) => fetch(`${API}/models/${modelName}:generateContent`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
       signal: AbortSignal.timeout(24_000),
       body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: `Use Google Search grounding to verify specifications for ${brand} ${model}. Return strict JSON only. Use null for anything you cannot verify. Never guess. Include sourceUrls from authoritative public sources. Match this object shape: {"display":{"sizeInches":number|null,"resolution":{"width":number,"height":number}|null,"type":string|null,"refreshRateHz":number|null,"brightnessNits":number|null,"protection":string|null}|null,"chipset":string|null,"cpu":string|null,"gpu":string|null,"rearCamera":[{"name":string,"megapixels":number|null,"details":string|null}]|null,"frontCamera":{"megapixels":number|null,"details":string|null}|null,"batteryMah":number|null,"chargingWatts":number|null,"fiveG":boolean|null,"nfc":boolean|null,"esim":boolean|null,"dimensionsMm":{"height":number,"width":number,"depth":number}|null,"weightGrams":number|null,"waterRating":string|null,"os":string|null,"ramGb":number|null,"storageGb":number|null,"sourceUrls":[string]}.` }] }],
-        tools: [{ google_search: {} }],
+        contents: [{ role: 'user', parts: [{ text: `${grounded ? 'Use Google Search grounding to verify' : 'From what you reliably know, give'} specifications for ${brand} ${model}. Return strict JSON only. Use null for anything you cannot verify. Never guess. Include sourceUrls from authoritative public sources. Match this object shape: {"display":{"sizeInches":number|null,"resolution":{"width":number,"height":number}|null,"type":string|null,"refreshRateHz":number|null,"brightnessNits":number|null,"protection":string|null}|null,"chipset":string|null,"cpu":string|null,"gpu":string|null,"rearCamera":[{"name":string,"megapixels":number|null,"details":string|null}]|null,"frontCamera":{"megapixels":number|null,"details":string|null}|null,"batteryMah":number|null,"chargingWatts":number|null,"fiveG":boolean|null,"nfc":boolean|null,"esim":boolean|null,"dimensionsMm":{"height":number,"width":number,"depth":number}|null,"weightGrams":number|null,"waterRating":string|null,"os":string|null,"ramGb":number|null,"storageGb":number|null,"sourceUrls":[string]}.` }] }],
+        ...(grounded ? { tools: [{ google_search: {} }] } : {}),
         generationConfig: { temperature: 0 },
       }),
     })
@@ -79,10 +86,18 @@ export const geminiProvider: SpecProvider = {
       const picked = pickFlashModel(await listModels(apiKey))
       if (picked && picked !== modelName) { discoveredModel = picked; modelName = picked; response = await request(modelName) }
     }
+    // The free tier may not include Google Search grounding; a plain request usually still works.
+    if (response.status === 429) {
+      response = await request(modelName, false)
+      if (response.status === 429 && !override) {
+        const picked = pickFlashModel(await listModels(apiKey))
+        if (picked && picked !== modelName) { discoveredModel = picked; modelName = picked; response = await request(modelName, false) }
+      }
+    }
     if (response.status === 404) throw new Error(`Google AI model "${modelName}" was not found. Set GEMINI_MODEL to a current model name.`)
-    if (response.status === 400 || response.status === 403) throw new Error('Google rejected the AI key. Check GEMINI_API_KEY in the hosting environment variables.')
-    if (response.status === 429) throw new Error('AI lookup is busy, try again or paste specs.')
-    if (!response.ok) throw new Error(`Gemini lookup returned HTTP ${response.status}.`)
+    if (response.status === 400 || response.status === 403) throw new Error(`Google rejected the AI key (${await googleReason(response)}). Check GEMINI_API_KEY in the hosting environment variables.`)
+    if (response.status === 429) throw new Error(`Google AI limit reached: ${await googleReason(response)} Try again later or paste specs.`)
+    if (!response.ok) throw new Error(`Gemini lookup returned HTTP ${response.status}: ${await googleReason(response)}`)
     const data = await response.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] }
     const text = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? '').join('') ?? ''
     let json: unknown
