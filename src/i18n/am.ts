@@ -112,6 +112,10 @@ export const amharic: Record<string, string> = {
   "Can you deliver?": "ታደርሳላችሁ?",
   "Contact us on WhatsApp to confirm current delivery options and charges for your area.": "ለአካባቢዎ የአሁኑን የማድረስ አማራጮችና ክፍያ ለማረጋገጥ በዋትስአፕ ያግኙን።",
 
+  // Theme
+  "Switch to dark theme": "ወደ ጨለማ ገጽታ ቀይር",
+  "Switch to light theme": "ወደ ብሩህ ገጽታ ቀይር",
+
   // Hero carousel
   "New phones": "አዳዲስ ስልኮች",
   "NEW ARRIVAL": "አዲስ የገባ",

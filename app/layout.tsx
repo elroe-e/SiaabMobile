@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { cookies } from 'next/headers'
 import { DM_Sans, Manrope, Noto_Sans_Ethiopic } from 'next/font/google'
 import { LANGUAGE_COOKIE, parseLanguage } from '../src/i18n/language'
+import { THEME_COOKIE, parseTheme, themeBootScript } from '../src/lib/theme'
 import './globals.css'
 
 const dmSans = DM_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700'], display: 'swap', variable: '--font-dm-sans' })
@@ -19,14 +20,19 @@ export const metadata: Metadata = {
     images: ['/og-image.svg'],
   },
   twitter: { card: 'summary_large_image' },
-  icons: { icon: '/favicon.svg' },
+  applicationName: 'SiaabMobile',
+  appleWebApp: { capable: true, title: 'SiaabMobile', statusBarStyle: 'default' },
+  icons: { icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }, { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }], apple: '/icons/apple-touch-icon.png' },
 }
 
-export const viewport: Viewport = { themeColor: '#f7f8fa' }
+export const viewport: Viewport = { themeColor: [{ media: '(prefers-color-scheme: light)', color: '#f7f8fa' }, { media: '(prefers-color-scheme: dark)', color: '#0d121b' }] }
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const lang = parseLanguage((await cookies()).get(LANGUAGE_COOKIE)?.value)
-  return <html lang={lang} className={`${dmSans.variable} ${manrope.variable} ${ethiopic.variable}`}>
+  const jar = await cookies()
+  const lang = parseLanguage(jar.get(LANGUAGE_COOKIE)?.value)
+  const theme = parseTheme(jar.get(THEME_COOKIE)?.value)
+  return <html lang={lang} {...(theme ? { 'data-theme': theme } : {})} suppressHydrationWarning className={`${dmSans.variable} ${manrope.variable} ${ethiopic.variable}`}>
+    <head><script dangerouslySetInnerHTML={{ __html: themeBootScript }} /></head>
     <body>{children}</body>
   </html>
 }

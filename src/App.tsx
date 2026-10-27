@@ -481,6 +481,7 @@ function Brands() {
   const brands = brandSummary(phones)
   return <div className="container page-container brands-page">
     <div className="page-intro"><div><span className="eyebrow">{t("SHOP BY BRAND")}</span><h1>{t("Pick a brand.")}</h1><p>{t("Every brand we have in the shop right now. Tap one to see its phones.")}</p></div></div>
+    <h2 className="sr-only">{t("Brands")}</h2>
     {brands.length ? <ul className="brand-grid" aria-label={t("Brands")}>{brands.map(({ brand, count }) => {
       const logo = brandLogo(brand)
       return <li key={brand}><Link href={`/phones?brand=${encodeURIComponent(brand)}`} className="brand-tile">
