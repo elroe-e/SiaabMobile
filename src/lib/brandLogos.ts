@@ -1,12 +1,9 @@
-import { siApple, siAsus, siGoogle, siHonor, siHuawei, siMotorola, siNokia, siOneplus, siOppo, siSamsung, siSony, siVivo, siXiaomi } from 'simple-icons'
+import { logoIcons } from './brandLogoPaths'
 
 type Icon = { path: string; hex: string }
 
-// Logos come from Simple Icons (CC0). Brands not listed here get a letter tile instead.
-const logos: Record<string, Icon> = {
-  apple: siApple, asus: siAsus, google: siGoogle, honor: siHonor, huawei: siHuawei, motorola: siMotorola,
-  nokia: siNokia, oneplus: siOneplus, oppo: siOppo, samsung: siSamsung, sony: siSony, vivo: siVivo, xiaomi: siXiaomi,
-}
+// Brands not listed in brandLogoPaths get a letter tile instead.
+const logos: Record<string, Icon> = logoIcons
 
 const key = (brand: string) => brand.toLowerCase().replace(/[^a-z0-9]/g, '')
 
