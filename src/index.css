@@ -884,13 +884,14 @@ p { color: var(--muted); line-height: 1.72; }
 @media (max-width: 900px) {
   .hero-deck { aspect-ratio: 4 / 4.6; margin-right: 26px; }
   .hero-slide-info strong { font-size: 17px; }
+  .hero-carousel { width: 72%; margin-inline: auto; }
 }
 /* Image viewer: swipe on touch screens, arrows only with a mouse */
 .zoom-dots { position: absolute; left: 0; right: 0; bottom: max(22px, env(safe-area-inset-bottom)); display: flex; justify-content: center; gap: 6px; pointer-events: none; }
 .zoom-dots span { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.4); }
 .zoom-dots span.active { background: var(--white); }
 @media (hover: none), (max-width: 900px) { .zoom-arrow { display: none !important; } .zoom-overlay img { touch-action: pan-y; } }
-@media (min-width: 901px) { .hero-carousel { width: 100%; max-width: 470px; justify-self: center; } }
+@media (min-width: 901px) { .hero-carousel { width: 100%; max-width: 330px; justify-self: center; } .hero-slide-info strong { font-size: 17px; } }
 /* Card footer: price on its own line, both buttons share the full card width so neither is clipped */
 .phone-card-footer { flex-direction: column; align-items: stretch; gap: 10px; }
 .phone-card-footer > div:first-child { flex-direction: row; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
