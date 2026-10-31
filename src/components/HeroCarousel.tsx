@@ -82,7 +82,8 @@ export function HeroCarousel({ phones }: { phones: Phone[] }) {
         const depth = deckDepth(index, active, count)
         const top = depth === 0
         const style = {
-          '--depth': depth,
+          // Hidden cards wait just behind the last visible one instead of fanning past the screen edge.
+          '--depth': Math.min(depth, VISIBLE_BEHIND + 1),
           zIndex: count - depth,
           ...(top && (thrown || dragX) ? { transform: thrown ? `translateX(${thrown * 115}%) rotate(${thrown * 14}deg)` : `translateX(${dragX}px) rotate(${dragX / 18}deg)` } : {}),
         } as CSSProperties
