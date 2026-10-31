@@ -861,6 +861,8 @@ p { color: var(--muted); line-height: 1.72; }
 .catalog-results { min-width: 0; }
 /* Hero: the newest phones as a hand-held deck of cards */
 .hero-carousel { position: relative; min-width: 0; }
+/* Phone browsers ignore overflow on <html> while a card is swiped past the screen edge, so the page itself clips. */
+.home-page { overflow-x: clip; }
 .hero-deck { position: relative; aspect-ratio: 4 / 5; margin-right: 34px; }
 .hero-slide { --depth: 0; position: absolute; inset: 0; overflow: hidden; border-radius: 24px; background: #e9eef7; box-shadow: 0 22px 50px rgba(28,49,82,.14); transform-origin: 50% 100%; transform: translateX(calc(var(--depth) * 15px)) rotate(calc(var(--depth) * 3.5deg)) scale(calc(1 - var(--depth) * .045)); transition: transform .34s var(--ease-out), opacity .3s ease, filter .3s ease; touch-action: pan-y; cursor: grab; -webkit-user-select: none; user-select: none; }
 .hero-slide:not(.is-top) { filter: brightness(.9); pointer-events: none; }
