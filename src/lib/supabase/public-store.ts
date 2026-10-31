@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { shop as sampleShop } from '../../data/shop'
 import { tradeInValues as sampleTradeValues } from '../../data/tradeInValues'
 import { upcomingPhones as sampleUpcoming } from '../../data/upcoming'
+import { placeholderImages } from '../../data/phones'
 import { tradeInConfig as sampleTradeConfig } from '../tradeIn'
 import type { StoreData } from '../../context/StoreDataContext'
 import type { TradeInConfig } from '../tradeIn'
@@ -65,7 +66,7 @@ export async function getPublicStoreData(): Promise<StoreData> {
       teaser: model.tagline || sample?.teaser || 'More details coming soon.',
       expectedPriceRange: model.expected_price_range || sample?.expectedPriceRange || 'To be announced',
       keyRumoredSpecs: specs.length ? specs : sample?.keyRumoredSpecs ?? ['Details to be announced'],
-      image: photo ? `${url}/storage/v1/object/public/phone-photos/${photo.path}` : sample?.image ?? '/og-image.svg',
+      image: photo ? `${url}/storage/v1/object/public/phone-photos/${photo.path}` : sample?.image ?? placeholderImages(model.slug)[0] ?? '/og-image.svg',
       notifyEnabled: true,
     }
   })

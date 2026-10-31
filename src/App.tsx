@@ -21,7 +21,7 @@ import { useSpecMode } from './hooks/useSpecMode'
 import { useDebounce } from './hooks/useDebounce'
 import type { TradeInAnswers, TradeInEstimate, UpcomingPhone } from './types'
 import type { Phone } from './types'
-import { AdvancedSpecs, FloatingWhatsApp, Footer, Header, ShareButton, KeySpecs, PhoneCard, SectionHeading, SpecSwitcher, StockBadge, TrustStrip } from './components/Storefront'
+import { AdvancedSpecs, FloatingCall, Footer, Header, ShareButton, KeySpecs, PhoneCard, SectionHeading, SpecSwitcher, StockBadge, TrustStrip } from './components/Storefront'
 import { defaultStoreData, StoreDataProvider, useStoreData, type StoreData } from './context/StoreDataContext'
 import { LanguageProvider, useT } from './i18n'
 import type { Language } from './i18n/language'
@@ -73,7 +73,7 @@ function StorefrontApp({ initialPhones }: { initialPhones: Phone[] }) {
               : pathname === '/contact' ? <Contact />
                 : pathname === '/brands' ? <Brands />
                 : <NotFound />
-  return <PhoneContext.Provider value={phoneData}><Header /><main id="main-content">{page}</main><Footer /><FloatingWhatsApp /></PhoneContext.Provider>
+  return <PhoneContext.Provider value={phoneData}><Header /><main id="main-content">{page}</main><Footer /><FloatingCall /></PhoneContext.Provider>
 }
 
 function Home() {

@@ -31,7 +31,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const jar = await cookies()
   const lang = parseLanguage(jar.get(LANGUAGE_COOKIE)?.value)
   const theme = parseTheme(jar.get(THEME_COOKIE)?.value)
-  return <html lang={lang} {...(theme ? { 'data-theme': theme } : {})} suppressHydrationWarning className={`${dmSans.variable} ${manrope.variable} ${ethiopic.variable}`}>
+  return <html lang={lang} translate="no" {...(theme ? { 'data-theme': theme } : {})} suppressHydrationWarning className={`${dmSans.variable} ${manrope.variable} ${ethiopic.variable}`}>
     <head><script dangerouslySetInnerHTML={{ __html: themeBootScript }} /></head>
     <body>{children}</body>
   </html>
