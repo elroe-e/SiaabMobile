@@ -188,7 +188,7 @@ p { color: var(--muted); line-height: 1.72; }
 .trade-banner p { margin: 0; font-size: 12px; }
 .trade-banner .button { position: relative; z-index: 1; flex: 0 0 auto; margin-left: auto; }
 .trade-banner-decoration { position: absolute; right: 206px; bottom: -89px; color: rgba(255,255,255,.5); font: 260px/1 Manrope; transform: rotate(13deg); }
-.upcoming-teaser { margin-top: 84px; background: #f0f3f8; }
+.upcoming-teaser { margin-top: 56px; background: #f0f3f8; }
 .upcoming-mini-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 17px; }
 .upcoming-mini { min-width: 0; display: grid; grid-template-columns: 90px 1fr 18px; align-items: center; gap: 13px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--white); transition: transform .2s, box-shadow .2s; }
 @media (hover: hover) and (pointer: fine) { .upcoming-mini:hover { transform: translateY(-3px); box-shadow: var(--shadow-soft); } }
@@ -859,28 +859,30 @@ p { color: var(--muted); line-height: 1.72; }
 }
 @media (prefers-reduced-motion: reduce) { .brand-tile:hover, .brand-tile:active { transform: none; } }
 .catalog-results { min-width: 0; }
-/* Hero: swipeable showcase of the newest phones */
+/* Hero: the newest phones as a hand-held deck of cards */
 .hero-carousel { position: relative; min-width: 0; }
-.hero-track { display: grid; grid-auto-flow: column; grid-auto-columns: 100%; gap: 14px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; border-radius: 24px; -webkit-overflow-scrolling: touch; }
-.hero-track::-webkit-scrollbar { display: none; }
-.hero-slide { position: relative; aspect-ratio: 4 / 5; overflow: hidden; border-radius: 24px; background: #e9eef7; scroll-snap-align: start; box-shadow: 0 22px 50px rgba(28,49,82,.14); -webkit-user-select: none; user-select: none; }
+.hero-deck { position: relative; aspect-ratio: 4 / 5; margin-right: 34px; }
+.hero-slide { --depth: 0; position: absolute; inset: 0; overflow: hidden; border-radius: 24px; background: #e9eef7; box-shadow: 0 22px 50px rgba(28,49,82,.14); transform-origin: 50% 100%; transform: translateX(calc(var(--depth) * 15px)) rotate(calc(var(--depth) * 3.5deg)) scale(calc(1 - var(--depth) * .045)); transition: transform .34s var(--ease-out), opacity .3s ease, filter .3s ease; touch-action: pan-y; cursor: grab; -webkit-user-select: none; user-select: none; }
+.hero-slide:not(.is-top) { filter: brightness(.9); pointer-events: none; }
+.hero-slide.is-dragging { transition: none; cursor: grabbing; }
+.hero-slide.is-hidden { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .hero-slide { transition: opacity .2s ease; } }
 .hero-slide img { width: 100%; height: 100%; object-fit: cover; }
 .hero-slide-info { position: absolute; left: 14px; right: 14px; bottom: 14px; display: grid; gap: 3px; padding: 14px 16px; border-radius: 16px; background: rgba(255,255,255,.94); box-shadow: var(--shadow-soft); backdrop-filter: blur(8px); }
 .hero-slide-info small { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .12em; }
 .hero-slide-info strong { color: var(--ink); font: 700 20px/1.2 var(--font-manrope), Manrope, sans-serif; letter-spacing: -.02em; }
 .hero-slide-info > span { color: var(--blue); font-size: 15px; font-weight: 700; }
-.hero-arrow { position: absolute; top: 42%; z-index: 2; width: 44px; height: 44px; display: none; place-items: center; border: 0; border-radius: 50%; background: rgba(255,255,255,.92); color: var(--ink); box-shadow: var(--shadow-soft); cursor: pointer; transition: transform .16s var(--ease-out), background .16s ease; }
+.hero-arrow { position: absolute; top: 42%; z-index: 20; width: 44px; height: 44px; display: none; place-items: center; border: 0; border-radius: 50%; background: rgba(255,255,255,.92); color: var(--ink); box-shadow: var(--shadow-soft); cursor: pointer; transition: transform .16s var(--ease-out), background .16s ease; }
 .hero-arrow:active { transform: scale(.94); }
 .hero-arrow-prev { left: 12px; }
-.hero-arrow-next { right: 12px; }
+.hero-arrow-next { right: 46px; }
 @media (hover: hover) and (pointer: fine) and (min-width: 900px) { .hero-arrow { display: grid; } .hero-arrow:hover { background: var(--white); } }
 .hero-dots { display: flex; justify-content: center; gap: 4px; margin-top: 12px; }
 .hero-dots button { width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 0; background: transparent; cursor: pointer; }
 .hero-dots button::before { content: ''; width: 8px; height: 8px; border-radius: 999px; background: #c9d1de; transition: width .2s var(--ease-out), background .2s ease; }
 .hero-dots button.active::before { width: 22px; background: var(--blue); }
 @media (max-width: 900px) {
-  .hero-track { grid-auto-columns: 86%; }
-  .hero-slide { aspect-ratio: 4 / 4.6; }
+  .hero-deck { aspect-ratio: 4 / 4.6; margin-right: 26px; }
   .hero-slide-info strong { font-size: 17px; }
 }
 /* Image viewer: swipe on touch screens, arrows only with a mouse */
