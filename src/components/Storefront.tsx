@@ -176,7 +176,7 @@ export function Footer() {
         </div>
         <div className="footer-column"><h3>{t("Explore")}</h3><Link href="/phones">{t("Shop phones")}</Link><Link href="/upcoming">{t("Coming soon")}</Link><Link href="/trade-in">{t("Trade-in estimate")}</Link></div>
         <div className="footer-column"><h3>{t("Say hello")}</h3><a href={`tel:${shop.phones[0]}`}>{shop.phones[0]}</a><a href={shop.telegram} target="_blank" rel="noreferrer">{t("Telegram")}</a><Link href="/contact">{t("Visit our store")}</Link></div>
-        <div className="footer-address"><span className="eyebrow">{t("FIND US IN ADDIS")}</span><p>{shop.address}</p><p>{shop.hours}</p><a href={shop.mapUrl} target="_blank" rel="noreferrer" className="text-link">{t("Get directions")} <ArrowUpRight size={15} /></a></div>
+        <div className="footer-address"><span className="eyebrow">{t("Find us in Addis")}</span><p>{shop.address}</p><p>{shop.hours}</p><a href={shop.mapUrl} target="_blank" rel="noreferrer" className="text-link">{t("Get directions")} <ArrowUpRight size={15} /></a></div>
       </div>
       <div className="container footer-bottom"><span>© {new Date().getFullYear()} {shop.name}{t(". All rights reserved.")}</span><span>{t("Prices and availability may change. Confirm with our team before visiting.")}</span></div>
     </footer>

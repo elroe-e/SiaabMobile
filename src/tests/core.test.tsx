@@ -117,7 +117,7 @@ describe('catalog and WhatsApp helpers', () => {
     render(<TradeIn />)
     fireEvent.click(screen.getByRole('button', { name: /continue/i }))
     expect(screen.getByRole('alert')).toHaveTextContent('Choose a brand, model and storage')
-    expect(screen.getByText('STEP 1 OF 3')).toBeInTheDocument()
+    expect(screen.getByText('Step 1 of 3')).toBeInTheDocument()
   })
 })
 
