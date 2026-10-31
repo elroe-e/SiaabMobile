@@ -17,6 +17,7 @@ import { useLanguage, useT } from '../i18n'
 
 const navLinks = [
   { label: 'Phones', to: '/phones' },
+  { label: 'Brands', to: '/brands' },
   { label: 'Upcoming', to: '/upcoming' },
   { label: 'Trade-in', to: '/trade-in' },
   { label: 'Our story', to: '/about' },
@@ -55,7 +56,7 @@ export function Header() {
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     const onResize = () => {
-      if (window.innerWidth > 800) setOpen(false)
+      if (window.innerWidth > 920) setOpen(false)
     }
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -82,7 +83,7 @@ export function Header() {
       document.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('resize', onResize)
       document.body.style.overflow = previousOverflow
-      if (window.innerWidth <= 800) menuButtonRef.current?.focus()
+      if (window.innerWidth <= 920) menuButtonRef.current?.focus()
     }
   }, [open])
   const { shop } = useStoreData()

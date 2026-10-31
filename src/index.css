@@ -87,7 +87,7 @@ p { color: var(--muted); line-height: 1.72; }
 .brand-name { font: 800 17px/1 var(--font-manrope), Manrope, sans-serif; letter-spacing: -.07em; color: var(--ink); }
 .brand-name span { color: var(--blue); }
 .desktop-nav { display: flex; align-items: center; gap: clamp(18px, 2.4vw, 33px); margin-left: auto; margin-right: 30px; }
-.nav-link { position: relative; padding: 28px 0 25px; color: #657087; font-size: 12px; font-weight: 600; transition: color .2s; }
+.nav-link { position: relative; padding: 28px 0 25px; white-space: nowrap; color: #657087; font-size: 12px; font-weight: 600; transition: color .2s; }
 .nav-link::after { position: absolute; content: ''; left: 0; right: 0; bottom: 18px; height: 2px; transform: scaleX(0); background: var(--blue); transition: transform .2s; }
 .nav-link.active { color: var(--ink); }
 @media (hover: hover) and (pointer: fine) { .nav-link:hover { color: var(--ink); } }
@@ -540,8 +540,8 @@ p { color: var(--muted); line-height: 1.72; }
   .footer-main { gap: 26px; }
   .catalog-layout { grid-template-columns: 190px minmax(0,1fr); gap: 17px; }
 }
-@media (max-width: 800px) {
-  .container { width: calc(100% - 40px); }
+/* The header switches to the menu button before its six links and actions get crowded */
+@media (max-width: 920px) {
   .header-inner { width: calc(100% - 40px); }
   .desktop-nav { display: none; }
   .header-actions { gap: 8px; }
@@ -564,6 +564,9 @@ p { color: var(--muted); line-height: 1.72; }
   @media (hover: hover) and (pointer: fine) { .mobile-nav nav > a:hover { color: var(--blue); } }
   .mobile-nav-bottom { display: flex; flex-direction: column; gap: 6px; margin-top: auto; padding: 15px; border-radius: 9px; background: #edf2fa; color: var(--muted); font-size: 11px; }
   .mobile-nav-bottom strong { color: var(--ink); font-size: 11px; line-height: 1.5; }
+}
+@media (max-width: 800px) {
+  .container { width: calc(100% - 40px); }
   .hero-section { min-height: 520px; grid-template-columns: 1fr .88fr; gap: 0; }
   .hero-copy { padding-left: 0; }
   .hero-copy h1 { font-size: clamp(48px, 7vw, 63px); }
