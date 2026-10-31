@@ -826,11 +826,11 @@ p { color: var(--muted); line-height: 1.72; }
 .assurance-list { display: grid; gap: 6px; margin: 14px 0 0; padding: 0; list-style: none; }
 .assurance-list li { display: flex; align-items: center; gap: 8px; color: var(--ink-soft); font-size: 13px; }
 .assurance-list svg { color: var(--green); flex: none; }
-.floating-wa { position: fixed; z-index: 35; right: max(18px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom)); width: 54px; height: 54px; display: grid; place-items: center; border-radius: 50%; background: #158565; color: #fff; box-shadow: 0 10px 26px rgba(15,60,45,.32); transition: transform .16s var(--ease-out), background .16s ease; }
-.floating-wa:active { transform: scale(.94); }
-@media (hover: hover) and (pointer: fine) { .floating-wa:hover { background: #0e7153; transform: translateY(-2px); } }
-@media (max-width: 900px) { .floating-wa-product { display: none; } }
-@media (prefers-reduced-motion: reduce) { .floating-wa:hover, .floating-wa:active { transform: none; } }
+.floating-call { position: fixed; z-index: 35; right: max(18px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom)); width: 54px; height: 54px; display: grid; place-items: center; border-radius: 50%; background: #158565; color: #fff; box-shadow: 0 10px 26px rgba(15,60,45,.32); transition: transform .16s var(--ease-out), background .16s ease; }
+.floating-call:active { transform: scale(.94); }
+@media (hover: hover) and (pointer: fine) { .floating-call:hover { background: #0e7153; transform: translateY(-2px); } }
+@media (max-width: 900px) { .floating-call-product { display: none; } }
+@media (prefers-reduced-motion: reduce) { .floating-call:hover, .floating-call:active { transform: none; } }
 .share-wrap { position: relative; }
 .share-menu { position: absolute; z-index: 20; top: calc(100% + 8px); left: 0; min-width: 190px; display: grid; padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--white); box-shadow: var(--shadow); transform-origin: top left; animation: fade-in .14s var(--ease-out); }
 .share-menu a, .share-menu button { padding: 11px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font-size: 14px; font-weight: 600; text-align: left; cursor: pointer; }
@@ -923,3 +923,26 @@ html[data-theme="dark"]:not(:has(.admin-root)) ::selection { color: #fff; backgr
 @media (max-width: 420px) { .header-actions { gap: 7px; } .theme-toggle, .lang-toggle { height: 35px; } .theme-toggle { width: 35px; } .lang-toggle { min-width: 40px; padding: 0 8px; } }
 .admin-root { color-scheme: light; }
 html[data-theme="dark"]:not(:has(.admin-root)) .trade-steps-list li.active > span { color: #17243c; }
+/* Phone cards: brand logo, savings, two-line chip names, an even photo frame and a shimmer while photos load */
+.phone-brand { display: inline-flex; align-items: center; gap: 5px; }
+.phone-brand svg { flex: none; width: 13px; height: 13px; }
+.save-badge { padding: 2px 7px; border-radius: 999px; background: var(--green-pale); color: var(--green); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.phone-card .key-spec strong { display: -webkit-box; white-space: normal; overflow-wrap: anywhere; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.product-art-link { background: linear-gradient(160deg, #f4f6fb, #e4e9f2); }
+.product-art-link::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(16,24,40,.1), rgba(16,24,40,0) 38%); box-shadow: inset 0 0 0 1px rgba(16,24,40,.06); pointer-events: none; }
+.product-art-link::before { content: ''; position: absolute; z-index: 1; inset: 0; background: linear-gradient(100deg, rgba(255,255,255,0) 30%, rgba(255,255,255,.6) 50%, rgba(255,255,255,0) 70%); transform: translateX(-100%); animation: photo-shimmer 1.3s ease-in-out infinite; pointer-events: none; }
+.product-art-link:has(> img[data-loaded])::before { display: none; }
+.product-card-badges, .product-arrow { z-index: 2; }
+@keyframes photo-shimmer { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .product-art-link::before { animation: none; transform: none; opacity: .4; } }
+/* Phones: show at most four key specs per card so two cards fit on a screen */
+@media (max-width: 640px) {
+  .phone-card .key-spec:nth-child(n+5) { display: none; }
+  .phone-card .product-art-link { min-height: 180px; }
+}
+/* The corner call button never covers the end of the page */
+@media (max-width: 900px) {
+  .floating-call { width: 50px; height: 50px; }
+  .site-footer { padding-bottom: 76px; }
+}
+html[data-theme="dark"]:not(:has(.admin-root)) .upcoming-teaser { background: #111826; border-block: 1px solid var(--line); }

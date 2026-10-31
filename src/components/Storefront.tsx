@@ -4,10 +4,11 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   ArrowUpRight, BatteryCharging, Camera, Check, ChevronDown, Cpu, HardDrive, Menu, MessageCircle, Moon, Share2, Sun,
-  Monitor, PhoneCall, ShieldCheck, Smartphone, X,
+  Monitor, Phone as PhoneIcon, PhoneCall, ShieldCheck, Smartphone, X,
 } from 'lucide-react'
 import { useStoreData } from '../context/StoreDataContext'
 import { BrandMark } from './BrandMark'
+import { brandLogo } from '../lib/brandLogos'
 import { THEME_COOKIE, type Theme } from '../lib/theme'
 import { formatPrice, formatStorage, fullPhoneName } from '../lib/format'
 import { createWhatsAppUrl, phoneOrderMessage } from '../lib/whatsapp'
@@ -122,14 +123,15 @@ export function Header() {
   )
 }
 
-export function FloatingWhatsApp() {
+/** Round call button in the corner; many customers phone rather than use WhatsApp. */
+export function FloatingCall() {
   const t = useT()
   const pathname = usePathname()
   const { shop } = useStoreData()
   const onProductPage = pathname.startsWith('/phones/')
-  const number = shop.whatsapp[0]
+  const number = shop.phones[0]
   if (!number) return null
-  return <a className={`floating-wa ${onProductPage ? 'floating-wa-product' : ''}`} href={createWhatsAppUrl(`Hello ${shop.name}, I have a question about a phone.`, number)} target="_blank" rel="noreferrer" aria-label={t("Chat with us on WhatsApp")}><MessageCircle size={24} /></a>
+  return <a className={`floating-call ${onProductPage ? 'floating-call-product' : ''}`} href={`tel:${number.replace(/[^\d+]/g, '')}`} aria-label={`${t("Call the shop")} ${number}`}><PhoneIcon size={24} /></a>
 }
 
 export function ShareButton({ title, url }: { title: string; url: string }) {
@@ -178,7 +180,8 @@ export function Footer() {
 }
 
 export function SectionHeading({ eyebrow, title, text, link, to }: { eyebrow: string; title: string; text?: string; link?: string; to?: string }) {
-  return <div className="section-heading"><div><span className="eyebrow">{eyebrow}</span><h2>{title}</h2>{text && <p>{text}</p>}</div>{link && to && <Link href={to} className="text-link">{link}<ArrowUpRight size={16} /></Link>}</div>
+  const t = useT()
+  return <div className="section-heading"><div><span className="eyebrow">{t(eyebrow)}</span><h2>{t(title)}</h2>{text && <p>{t(text)}</p>}</div>{link && to && <Link href={to} className="text-link">{t(link)}<ArrowUpRight size={16} /></Link>}</div>
 }
 
 const statusLabel = { in_stock: 'In stock', low_stock: 'Only a few left', out_of_stock: 'Sold out' }
@@ -209,13 +212,16 @@ const specLabels: Record<string, string> = { display: 'Display', camera: 'Camera
 export function KeySpecs({ phone, mode }: { phone: Phone; mode: SpecMode }) {
   const t = useT()
   if (mode === 'simple') {
-    return <div className="key-spec-grid">{Object.entries(phone.simpleSpecs).map(([key, value]) => {
+    // Blank specs are left out rather than shown as "Not specified".
+    return <div className="key-spec-grid">{Object.entries(phone.simpleSpecs).filter(([, value]) => value && value !== 'Not specified').map(([key, value]) => {
       const Icon = specIcons[key as keyof typeof specIcons]
       return <div className="key-spec" key={key}><Icon size={16} /><span>{specLabels[key] ? t(specLabels[key]) : key}</span><strong>{value}</strong></div>
     })}</div>
   }
   return <div className="card-advanced-specs">{Object.entries(phone.advancedSpecs).slice(0, 3).map(([group, specs]) => <div key={group}><span>{group}</span><strong>{Object.entries(specs).slice(0, 2).map(([key, value]) => `${key}: ${value}`).join(' · ')}</strong></div>)}</div>
 }
+
+const markLoaded = (event: React.SyntheticEvent<HTMLImageElement>) => { event.currentTarget.dataset.loaded = '1' }
 
 export function PhoneCard({ phone, mode = 'simple', compact = false }: { phone: Phone; mode?: SpecMode; compact?: boolean }) {
   const t = useT()
@@ -224,17 +230,21 @@ export function PhoneCard({ phone, mode = 'simple', compact = false }: { phone: 
     ? `Hello ${shop.name}, please let me know when ${fullPhoneName(phone.brand, phone.model)} is back in stock.`
     : phoneOrderMessage(`${fullPhoneName(phone.brand, phone.model)}`, formatStorage(phone.storageOptions[0]?.gb ?? 128), formatPrice(phone.price), `${shop.siteUrl}/phones/${phone.slug}`, shop.name)
   const order = createWhatsAppUrl(orderMessage, shop.whatsapp[0])
+  const logo = brandLogo(phone.brand)
+  const saving = phone.oldPrice && phone.oldPrice > phone.price ? phone.oldPrice - phone.price : 0
   return (
     <article className={`phone-card ${compact ? 'phone-card-compact' : ''}`}>
       <Link href={`/phones/${phone.slug}`} className="product-art-link">
-        <img className="product-art" src={phone.images[0]} alt={`${fullPhoneName(phone.brand, phone.model)} phone`} loading="lazy" />
+        <img className="product-art" src={phone.images[0]} alt={`${fullPhoneName(phone.brand, phone.model)} phone`} loading="lazy"
+          // Marks the photo as loaded to stop the shimmer; the ref covers photos that loaded before React attached.
+          ref={(img) => { if (img?.complete) img.dataset.loaded = '1' }} onLoad={markLoaded} onError={markLoaded} />
         <div className="product-card-badges">{phone.badges.slice(0, 1).map((badge) => <span className="pill" key={badge}>{badge}</span>)}</div>
         <span className="product-arrow"><ArrowUpRight size={17} /></span>
       </Link>
       <div className="phone-card-content">
-        <div className="phone-card-title"><div><span className="phone-brand">{phone.brand}</span><h3><Link href={`/phones/${phone.slug}`}>{phone.model}</Link></h3></div><StockBadge stock={phone.stock} count={phone.stockCount} /></div>
+        <div className="phone-card-title"><div><span className="phone-brand">{logo && <svg viewBox="0 0 24 24" aria-hidden="true"><path d={logo.path} fill={logo.color} /></svg>}{phone.brand}</span><h3><Link href={`/phones/${phone.slug}`}>{phone.model}</Link></h3></div><StockBadge stock={phone.stock} count={phone.stockCount} /></div>
         <KeySpecs phone={phone} mode={mode} />
-        <div className="phone-card-footer"><div><span className="price-label">{t("From")}</span><strong>{formatPrice(phone.price)}</strong>{phone.oldPrice && <del>{formatPrice(phone.oldPrice)}</del>}</div><div className="phone-card-actions"><Link href={`/phones/${phone.slug}`} className="button button-light button-small">{t("Details")}</Link><a href={order} target="_blank" rel="noreferrer" className={`button button-whatsapp button-small ${phone.stock === 'out_of_stock' ? 'button-disabled' : ''}`} aria-label={phone.stock === 'out_of_stock' ? `Ask when ${phone.model} will be available` : `Ask about ${phone.model} on WhatsApp`}><MessageCircle size={15} />{phone.stock === 'out_of_stock' ? t("Notify") : t("WhatsApp")}</a></div></div>
+        <div className="phone-card-footer"><div><span className="price-label">{t("From")}</span><strong>{formatPrice(phone.price)}</strong>{saving > 0 && <><del>{formatPrice(phone.oldPrice ?? 0)}</del><span className="save-badge">{t("Save")} {formatPrice(saving)}</span></>}</div><div className="phone-card-actions"><Link href={`/phones/${phone.slug}`} className="button button-light button-small">{t("Details")}</Link><a href={order} target="_blank" rel="noreferrer" className={`button button-whatsapp button-small ${phone.stock === 'out_of_stock' ? 'button-disabled' : ''}`} aria-label={phone.stock === 'out_of_stock' ? `Ask when ${phone.model} will be available` : `Ask about ${phone.model} on WhatsApp`}><MessageCircle size={15} />{phone.stock === 'out_of_stock' ? t("Notify") : t("WhatsApp")}</a></div></div>
       </div>
     </article>
   )

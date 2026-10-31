@@ -384,4 +384,12 @@ export const amharic: Record<string, string> = {
   "Let’s get you back to good phones and good advice.": "ወደ ጥሩ ስልኮችና መልካም ምክር እንመልስዎ።",
   "Go back": "ተመለስ",
   "Back to home": "ወደ መነሻ ተመለስ",
+  "ON THE HORIZON": "በቅርብ የሚመጣ",
+  "See what’s coming next. Dates and details are unconfirmed.": "ቀጥሎ የሚመጣውን ይመልከቱ። ቀኖችና ዝርዝሮች ገና አልተረጋገጡም።",
+  "Explore upcoming": "የሚመጡትን ይመልከቱ",
+  "A FEW GOOD PICKS": "ጥቂት ጥሩ ምርጫዎች",
+  "Thoughtful picks for every kind of upgrade.": "ለእያንዳንዱ ማሻሻያ የተመረጡ ስልኮች።",
+  "View all phones": "ሁሉንም ስልኮች ይመልከቱ",
+  "YOU MIGHT ALSO LIKE": "ይህም ሊወዱት ይችላሉ",
+  "Save": "ይቆጥቡ",
 }
