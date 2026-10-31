@@ -123,6 +123,9 @@ export function Header() {
   )
 }
 
+/** A tel: link with the spaces and dashes taken out of a shop number. */
+export const telLink = (number: string) => `tel:${number.replace(/[^\d+]/g, '')}`
+
 /** Round call button in the corner; many customers phone rather than use WhatsApp. */
 export function FloatingCall() {
   const t = useT()
@@ -131,7 +134,7 @@ export function FloatingCall() {
   const onProductPage = pathname.startsWith('/phones/')
   const number = shop.phones[0]
   if (!number) return null
-  return <a className={`floating-call ${onProductPage ? 'floating-call-product' : ''}`} href={`tel:${number.replace(/[^\d+]/g, '')}`} aria-label={`${t("Call the shop")} ${number}`}><PhoneIcon size={24} /></a>
+  return <a className={`floating-call ${onProductPage ? 'floating-call-product' : ''}`} href={telLink(number)} aria-label={`${t("Call the shop")} ${number}`}><PhoneIcon size={24} /></a>
 }
 
 export function ShareButton({ title, url }: { title: string; url: string }) {
@@ -244,7 +247,7 @@ export function PhoneCard({ phone, mode = 'simple', compact = false }: { phone: 
       <div className="phone-card-content">
         <div className="phone-card-title"><div><span className="phone-brand">{logo && <svg viewBox="0 0 24 24" aria-hidden="true"><path d={logo.path} fill={logo.color} /></svg>}{phone.brand}</span><h3><Link href={`/phones/${phone.slug}`}>{phone.model}</Link></h3></div><StockBadge stock={phone.stock} count={phone.stockCount} /></div>
         <KeySpecs phone={phone} mode={mode} />
-        <div className="phone-card-footer"><div><span className="price-label">{t("From")}</span><strong>{formatPrice(phone.price)}</strong>{saving > 0 && <><del>{formatPrice(phone.oldPrice ?? 0)}</del><span className="save-badge">{t("Save")} {formatPrice(saving)}</span></>}</div><div className="phone-card-actions"><Link href={`/phones/${phone.slug}`} className="button button-light button-small">{t("Details")}</Link><a href={order} target="_blank" rel="noreferrer" className={`button button-whatsapp button-small ${phone.stock === 'out_of_stock' ? 'button-disabled' : ''}`} aria-label={phone.stock === 'out_of_stock' ? `Ask when ${phone.model} will be available` : `Ask about ${phone.model} on WhatsApp`}><MessageCircle size={15} />{phone.stock === 'out_of_stock' ? t("Notify") : t("WhatsApp")}</a></div></div>
+        <div className="phone-card-footer"><div><span className="price-label">{t("From")}</span><strong>{formatPrice(phone.price)}</strong>{saving > 0 && <><del>{formatPrice(phone.oldPrice ?? 0)}</del><span className="save-badge">{t("Save")} {formatPrice(saving)}</span></>}</div><div className="phone-card-actions"><Link href={`/phones/${phone.slug}`} className="button button-light button-small">{t("Details")}</Link>{shop.phones[0] && <a href={telLink(shop.phones[0])} className="button button-call button-small" aria-label={`${t("Call the shop")} ${shop.phones[0]}`} title={t("Call the shop")}><PhoneIcon size={15} /></a>}<a href={order} target="_blank" rel="noreferrer" className={`button button-whatsapp button-small ${phone.stock === 'out_of_stock' ? 'button-disabled' : ''}`} aria-label={phone.stock === 'out_of_stock' ? `Ask when ${phone.model} will be available` : `Ask about ${phone.model} on WhatsApp`}><MessageCircle size={15} />{phone.stock === 'out_of_stock' ? t("Notify") : t("WhatsApp")}</a></div></div>
       </div>
     </article>
   )

@@ -899,7 +899,7 @@ p { color: var(--muted); line-height: 1.72; }
 .phone-card-footer > div:first-child { flex-direction: row; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
 .phone-card-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); gap: 6px; }
 .phone-card-actions .button { min-width: 0; width: 100%; padding: 0 8px; white-space: nowrap; }
-@media (max-width: 380px) { .phone-card-actions { grid-template-columns: 1fr; } }
+
 
 /* Dark theme. Colours for individual rules are generated at build time by postcss-dark-theme.cjs;
    these are the shared tokens and the few spots that need a hand-picked value. The admin stays light. */
@@ -946,3 +946,10 @@ html[data-theme="dark"]:not(:has(.admin-root)) .trade-steps-list li.active > spa
   .site-footer { padding-bottom: 76px; }
 }
 html[data-theme="dark"]:not(:has(.admin-root)) .upcoming-teaser { background: #111826; border-block: 1px solid var(--line); }
+/* Call buttons beside WhatsApp: on cards and in the phone page's bottom bar */
+.button-call { color: var(--green); background: var(--green-pale); }
+@media (hover: hover) and (pointer: fine) { .button-call:hover { background: #d3ecdf; } }
+.phone-card-actions { grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1.35fr); }
+.phone-card-actions .button-call { padding: 0; }
+.mobile-sticky-order > .mobile-sticky-actions { display: flex; flex-direction: row; gap: 8px; }
+.mobile-sticky-actions .button-call { width: 46px; padding: 0; }
