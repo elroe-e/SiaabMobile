@@ -98,7 +98,7 @@ export function HeroCarousel({ phones }: { phones: Phone[] }) {
           onClick={(event) => { if (dragged.current || !top) event.preventDefault(); dragged.current = false }}>
           <img src={phone.images[0]} alt={fullPhoneName(phone.brand, phone.model)} loading={depth <= VISIBLE_BEHIND ? 'eager' : 'lazy'} draggable={false} />
           <span className="hero-slide-info">
-            <small>{t("NEW ARRIVAL")} · {phone.brand.toUpperCase()}</small>
+            <small>{t("New arrival")} · {phone.brand}</small>
             <strong>{fullPhoneName(phone.brand, phone.model)}</strong>
             <span>{formatPrice(phone.price)}</span>
           </span>
