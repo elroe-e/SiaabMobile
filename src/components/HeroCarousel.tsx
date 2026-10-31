@@ -8,7 +8,7 @@ import { useT } from '../i18n'
 import { formatPrice, fullPhoneName } from '../lib/format'
 import type { Phone } from '../types'
 
-const AUTOPLAY_MS = 6000
+const AUTOPLAY_MS = 5000
 const THROW_MS = 320
 // A drag this far (px) sends the top card to the back; shorter drags spring back.
 const SWIPE_PX = 70
@@ -44,17 +44,18 @@ export function HeroCarousel({ phones }: { phones: Phone[] }) {
   }, [count, thrown])
   const previous = () => { if (!thrown) setActive((value) => (value - 1 + count) % count) }
 
-  // Gentle autoplay; stops for good once the visitor touches it, and never runs with reduced motion.
+  // Deals the next card every few seconds; waits while a mouse rests on it or a finger holds it, never runs with reduced motion.
+  // Any change of card restarts the count, so a manual swipe gets its full five seconds.
   useEffect(() => {
     if (paused || count < 2 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     const timer = window.setInterval(() => { if (!document.hidden) next() }, AUTOPLAY_MS)
     return () => window.clearInterval(timer)
-  }, [paused, next, count])
+  }, [paused, next, count, active])
 
   const onPointerDown = (event: PointerEvent<HTMLElement>) => {
-    setPaused(true)
     dragged.current = false
     if (count < 2 || thrown || event.button !== 0) return
+    setPaused(true)
     drag.current = { x: event.clientX, id: event.pointerId, moved: false }
   }
   const onPointerMove = (event: PointerEvent<HTMLElement>) => {
@@ -67,6 +68,7 @@ export function HeroCarousel({ phones }: { phones: Phone[] }) {
   const onPointerUp = () => {
     const current = drag.current
     drag.current = null
+    setPaused(false)
     if (!current?.moved) return
     if (Math.abs(dragX) > SWIPE_PX) next(dragX < 0 ? -1 : 1)
     else setDragX(0)
@@ -75,7 +77,7 @@ export function HeroCarousel({ phones }: { phones: Phone[] }) {
 
   if (count === 0) return null
   return <section className="hero-carousel" aria-roledescription="carousel" aria-label={t("New phones")}
-    onMouseEnter={() => setPaused(true)} onFocus={() => setPaused(true)}
+    onPointerEnter={(event) => { if (event.pointerType === 'mouse') setPaused(true) }} onPointerLeave={(event) => { if (event.pointerType === 'mouse') setPaused(false) }}
     onKeyDown={(event) => { if (event.key === 'ArrowRight') next(); if (event.key === 'ArrowLeft') previous() }}>
     <div className="hero-deck">
       {phones.map((phone, index) => {
@@ -104,9 +106,9 @@ export function HeroCarousel({ phones }: { phones: Phone[] }) {
       })}
     </div>
     {count > 1 && <>
-      <button type="button" className="hero-arrow hero-arrow-prev" onClick={() => { setPaused(true); previous() }} aria-label={t("Previous phone")}><ArrowLeft size={20} /></button>
-      <button type="button" className="hero-arrow hero-arrow-next" onClick={() => { setPaused(true); next() }} aria-label={t("Next phone")}><ArrowRight size={20} /></button>
-      <div className="hero-dots" role="group" aria-label={t("Choose a phone")}>{phones.map((phone, index) => <button key={phone.id} type="button" className={index === active ? 'active' : ''} aria-label={fullPhoneName(phone.brand, phone.model)} aria-current={index === active} onClick={() => { setPaused(true); if (!thrown) setActive(index) }} />)}</div>
+      <button type="button" className="hero-arrow hero-arrow-prev" onClick={previous} aria-label={t("Previous phone")}><ArrowLeft size={20} /></button>
+      <button type="button" className="hero-arrow hero-arrow-next" onClick={() => next()} aria-label={t("Next phone")}><ArrowRight size={20} /></button>
+      <div className="hero-dots" role="group" aria-label={t("Choose a phone")}>{phones.map((phone, index) => <button key={phone.id} type="button" className={index === active ? 'active' : ''} aria-label={fullPhoneName(phone.brand, phone.model)} aria-current={index === active} onClick={() => { if (!thrown) setActive(index) }} />)}</div>
     </>}
   </section>
 }
