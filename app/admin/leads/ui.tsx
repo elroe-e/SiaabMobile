@@ -4,12 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { MessageCircle, Phone, Search } from 'lucide-react'
 
 type Lead = { id: string; type: string; name: string; contact: string; payload: Record<string, unknown>; status: 'new' | 'contacted' | 'closed'; created_at: string }
-const labelType = (value: string) => value.replaceAll('_', ' ')
+const typeLabels: Record<string, string> = { notify_me: 'Upcoming reminders', trade_in: 'Trade-in', contact: 'Contact', reservation: 'Reservation' }
+const labelType = (value: string) => typeLabels[value] ?? value.replaceAll('_', ' ')
 const waLink = (contact: string) => `https://wa.me/${contact.replace(/\D/g, '')}`
 
 export function LeadsManager() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [filter, setFilter] = useState('all')
+  const [type, setType] = useState('all')
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -23,10 +25,10 @@ export function LeadsManager() {
   }, [])
   useEffect(() => { void load() }, [load])
   const visible = useMemo(() => leads.filter((lead) => {
-    const matchesStatus = filter === 'all' || lead.status === filter
+    const matchesStatus = (filter === 'all' || lead.status === filter) && (type === 'all' || lead.type === type)
     const matchesSearch = `${lead.name} ${lead.contact} ${lead.type} ${JSON.stringify(lead.payload)}`.toLowerCase().includes(search.toLowerCase())
     return matchesStatus && matchesSearch
-  }), [filter, leads, search])
+  }), [filter, type, leads, search])
 
   const update = async (lead: Lead, patch: Record<string, unknown>) => {
     setBusyId(lead.id); setError('')
@@ -41,7 +43,7 @@ export function LeadsManager() {
     <div className="admin-page-heading"><div><h2>Customer requests</h2><p>Trade-in, contact and notify-me requests from the storefront.</p></div><span className="admin-badge">{leads.filter((lead) => lead.status === 'new').length} new</span></div>
     {error && <div className="admin-error" role="alert">{error}</div>}
     <div className="admin-card">
-      <div className="admin-toolbar"><div className="admin-toolbar-left"><div className="admin-tabs" role="tablist" aria-label="Request status">{['all', 'new', 'contacted', 'closed'].map((status) => <button key={status} role="tab" aria-selected={filter === status} className={filter === status ? 'active' : ''} onClick={() => setFilter(status)}>{status === 'all' ? `All · ${leads.length}` : `${status} · ${leads.filter((lead) => lead.status === status).length}`}</button>)}</div></div><label className="input-icon-wrap admin-search-wrap"><Search size={14} /><input className="admin-input admin-search" placeholder="Search name, contact or details…" value={search} onChange={(event) => setSearch(event.target.value)} /></label></div>
+      <div className="admin-toolbar"><div className="admin-toolbar-left"><select className="admin-input" aria-label="Request type" value={type} onChange={(event) => setType(event.target.value)}><option value="all">All request types</option>{Object.entries(typeLabels).map(([value, label]) => <option key={value} value={value}>{label} · {leads.filter((lead) => lead.type === value).length}</option>)}</select><div className="admin-tabs" role="tablist" aria-label="Request status">{['all', 'new', 'contacted', 'closed'].map((status) => <button key={status} role="tab" aria-selected={filter === status} className={filter === status ? 'active' : ''} onClick={() => setFilter(status)}>{status === 'all' ? `All · ${leads.length}` : `${status} · ${leads.filter((lead) => lead.status === status).length}`}</button>)}</div></div><label className="input-icon-wrap admin-search-wrap"><Search size={14} /><input className="admin-input admin-search" placeholder="Search name, contact or details…" value={search} onChange={(event) => setSearch(event.target.value)} /></label></div>
       {loading ? <div className="admin-empty">Loading requests…</div> : visible.length === 0 ? <div className="admin-empty">No requests match your filters.</div> : <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Customer</th><th>Request</th><th>Details</th><th>Received</th><th>Status</th><th>Contact / action</th></tr></thead>
         <tbody>{visible.map((lead) => <tr key={lead.id}>
           <td><strong>{lead.name}</strong><small>{lead.contact}</small></td><td><span className="admin-badge">{labelType(lead.type)}</span></td>

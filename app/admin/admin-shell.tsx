@@ -57,7 +57,7 @@ export function AdminShell({ children, name, role }: { children: ReactNode; name
     <main className="admin-workspace">
       <header className="admin-topbar">
         <div><h1>Store management</h1><p>Keep your shop running smoothly.</p></div>
-        <div className="admin-top-actions"><span className="admin-profile"><span className="admin-avatar">{(name || 'S').slice(0, 1).toUpperCase()}</span><span>{name || 'Shop team'} · {role}</span></span></div>
+        <div className="admin-top-actions"><span className="admin-profile"><span className="admin-avatar">{(name || 'S').slice(0, 1).toUpperCase()}</span><span>{name || 'Shop team'} · {role === 'staff' ? 'seller' : role}</span></span></div>
       </header>
       <div className="admin-content">{children}</div>
     </main>
