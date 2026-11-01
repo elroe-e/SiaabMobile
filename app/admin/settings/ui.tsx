@@ -2,6 +2,7 @@
 
 import { BackupLink, BackupStatus } from '../backup-status'
 import { TwoFactorCard } from './two-factor'
+import { SellersCard } from './sellers'
 import { useCallback, useEffect, useState } from 'react'
 import { Download, Plus, Trash2 } from 'lucide-react'
 
@@ -69,7 +70,7 @@ export function SettingsManager() {
   if (loading) return <div className="admin-empty">Loading owner settings…</div>
   if (!data) return <div className="admin-error" role="alert">{error || 'Settings could not be loaded.'}</div>
   return <section>
-    <div className="admin-page-heading"><div><h2>Owner settings</h2><p>Store details, trade-in values, staff access and backup tools.</p></div><BackupLink className="button button-outline button-small"><Download size={14} /> Export everything</BackupLink></div>
+    <div className="admin-page-heading"><div><h2>Owner settings</h2><p>Store details, trade-in values, sellers and backup tools.</p></div><BackupLink className="button button-outline button-small"><Download size={14} /> Export everything</BackupLink></div>
     <div className="admin-alert"><strong>Backup reminder:</strong> <BackupStatus /> Download a fresh export monthly and keep it in a private, encrypted location. Never share the owner export; it contains private customer and inventory records.</div>
     {error && <div className="admin-error" role="alert">{error}</div>}{notice && <div className="admin-success" role="status">{notice}</div>}
     <TwoFactorCard />
@@ -99,10 +100,6 @@ export function SettingsManager() {
       </form>
       {data.tradeValues.length ? <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Device</th><th>Storage</th><th>Base value</th><th>Action</th></tr></thead><tbody>{data.tradeValues.map((row) => <tr key={row.id}><td><strong>{row.brand_text} {row.model_text}</strong></td><td>{row.storage_gb} GB</td><td>{price(row.base_value)}</td><td><button className="admin-icon-button danger" title="Remove value" onClick={() => void removeValue(row)}><Trash2 size={14} /></button></td></tr>)}</tbody></table></div> : <div className="admin-empty">No database trade-in values exist yet.</div>}
     </section>
-    <section className="admin-card" style={{ marginTop: 14 }}>
-      <div className="admin-card-title"><h3>Owner access</h3><span>Manage staff with the provisioning script</span></div>
-      <p className="admin-inline-note">Create owner and staff accounts from a secure terminal using <code>npm run admin:provision-owner</code> or <code>npm run admin:create-staff</code>. Never create public sign-up routes or expose a Supabase service-role key.</p>
-      <a className="button button-outline button-small" href="/admin/activity">Review security activity</a>
-    </section>
+    <SellersCard />
   </section>
 }
