@@ -68,6 +68,7 @@ export async function DELETE(request: Request) {
     // Only seller accounts can be removed here, so an owner can never lock themselves or another owner out.
     if (profile?.role !== 'staff') return NextResponse.json({ error: 'Only seller accounts can be removed here.' }, { status: 400 })
     // Blocking sign-in instead of deleting keeps the sales they recorded linked to them.
+    // shortcut: an open session keeps working until its token expires (about an hour), since the profile stays staff; add a disabled flag checked by is_staff_or_owner() if that must be instant.
     const { error: banError } = await service.auth.admin.updateUserById(parsed.data.id, { ban_duration: '876000h' })
     if (banError) return NextResponse.json({ error: banError.message }, { status: 500 })
     return NextResponse.json({ ok: true })

@@ -33,12 +33,12 @@ export function SellersCard() {
   }
 
   const remove = async (seller: Seller) => {
-    if (!window.confirm(`Remove ${seller.fullName || seller.email}? They will no longer be able to sign in. Sales they recorded stay in the history.`)) return
+    if (!window.confirm(`Remove ${seller.fullName || seller.email}? They will no longer be able to sign in, and if they are signed in now they are locked out within about an hour. Sales they recorded stay in the history.`)) return
     setError(''); setNotice('')
     const response = await fetch('/api/admin/team', { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: seller.id }) })
     const result = await response.json()
     if (!response.ok) setError(result.error ?? 'Could not remove the seller.')
-    else { setNotice(`${seller.fullName || seller.email} can no longer sign in.`); await load() }
+    else { setNotice(`${seller.fullName || seller.email} can no longer sign in. If they are signed in right now, access ends within about an hour.`); await load() }
   }
 
   return <section className="admin-card" style={{ marginTop: 14 }}>
