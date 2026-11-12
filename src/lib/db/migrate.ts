@@ -8,7 +8,12 @@ export type Runner = {
 }
 
 // Append new entries for later schema changes; never edit an applied one.
-const MIGRATIONS = [{ version: '001_initial', sql: schemaSql }]
+const MIGRATIONS = [
+  { version: '001_initial', sql: schemaSql },
+  // The Add-phone form saves unconfirmed phones as hidden drafts; the public views already hide them,
+  // and publishing still requires confirmed specs (create_inventory), so this gate only blocked drafts.
+  { version: '002_allow_unconfirmed_drafts', sql: 'drop trigger if exists phone_models_review_gate on public.phone_models' },
+]
 const LOCK_ID = 727_001
 
 /** Creates the tables on first start and fills the trade-in price list. Safe to call from several processes at once. */

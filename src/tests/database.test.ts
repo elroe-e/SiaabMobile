@@ -128,3 +128,21 @@ describe('timestamps', () => {
     expect(isoTimestamp('infinity')).toBe('infinity')
   })
 })
+
+describe('drafts', () => {
+  it('saves a phone whose specs are not confirmed yet, keeps it hidden, and still refuses to publish it', async () => {
+    const draft = await owner.rpc('create_inventory', {
+      p_model: { brand: 'Honor', name: 'Draft phone', slug: 'honor-draft', status: 'available', specs: {}, specsReviewed: false, published: false },
+      p_kind: 'new',
+      p_variant: { ramGb: 8, storageGb: 256, colorName: 'Black', price: 40000, stockCount: 2 },
+    })
+    expect(draft.error).toBeNull()
+    expect((await publicDb.from('public_models').select('id').eq('slug', 'honor-draft')).data).toEqual([])
+    const published = await owner.rpc('create_inventory', {
+      p_model: { brand: 'Honor', name: 'Draft phone 2', slug: 'honor-draft-2', status: 'available', specs: {}, specsReviewed: false, published: true },
+      p_kind: 'new',
+      p_variant: { ramGb: 8, storageGb: 256, colorName: 'Black', price: 40000, stockCount: 2 },
+    })
+    expect(published.error?.message).toMatch(/Confirm model specifications before publishing/)
+  })
+})
