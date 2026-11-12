@@ -1,10 +1,13 @@
 const MAX_BYTES = 200 * 1024
 
+// Some phones hand over camera photos without a file type, so the name decides when the type is missing.
+export const isPhotoFile = (file: File) => file.type ? file.type.startsWith('image/') : /\.(jpe?g|png|webp|gif|bmp|heic|heif|avif)$/i.test(file.name)
+
 const loadImage = (file: File) => new Promise<{ image: HTMLImageElement; release: () => void }>((resolve, reject) => {
   const image = new Image()
   const source = URL.createObjectURL(file)
   image.onload = () => resolve({ image, release: () => URL.revokeObjectURL(source) })
-  image.onerror = () => { URL.revokeObjectURL(source); reject(new Error(`${file.name} could not be read as an image.`)) }
+  image.onerror = () => { URL.revokeObjectURL(source); reject(new Error(`${file.name} could not be read as an image. If it is an iPhone HEIC photo, choose a JPEG copy or a screenshot instead.`)) }
   image.src = source
 })
 
@@ -20,7 +23,7 @@ const toDataUrl = (blob: Blob) => new Promise<string>((resolve, reject) => {
 
 /** Resizes to at most 1600px and converts to WebP, lowering quality until the file is under 200 KB. */
 export async function preparePhoto(file: File): Promise<string> {
-  if (!file.type.startsWith('image/')) throw new Error(`${file.name} is not an image.`)
+  if (!isPhotoFile(file)) throw new Error(`${file.name} is not an image.`)
   const { image, release } = await loadImage(file)
   try {
     let scale = Math.min(1, 1600 / Math.max(image.width, image.height))

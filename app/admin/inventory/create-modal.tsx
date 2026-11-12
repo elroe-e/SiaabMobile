@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { splitColors } from '../../../src/lib/colors'
-import { preparePhoto, uploadPhoto } from './photo-tools'
+import { isPhotoFile, preparePhoto, uploadPhoto } from './photo-tools'
 
 type Role = 'owner' | 'staff'
 type Kind = 'new' | 'used' | 'upcoming'
@@ -133,13 +133,22 @@ export function CreateInventoryModal({ role, onClose, onCreate, onFinished }: {
     }
     setBusy(false)
     if (failures.length) { setError(`The phone was saved, but some photos did not upload: ${failures.join(' ')} Open "Add model photos" on the phone to retry.`); return }
-    onFinished(reviewed && publish ? 'Phone saved and published.' : 'Phone saved as a draft.')
+    const photoNote = files.length ? ` with ${files.length} photo${files.length === 1 ? '' : 's'}` : ' without photos'
+    onFinished(reviewed && publish ? `Phone saved and published${photoNote}.` : `Phone saved as a draft${photoNote}.`)
   }
 
   const rows = specRows(specs)
   const addFiles = (list: FileList | null) => {
     if (!list) return
-    setFiles((current) => [...current, ...Array.from(list).filter((file) => file.type.startsWith('image/'))].slice(0, MAX_PHOTOS))
+    const picked = Array.from(list)
+    const images = picked.filter(isPhotoFile)
+    const room = MAX_PHOTOS - files.length
+    const problems = [
+      ...(images.length < picked.length ? [`${picked.length - images.length} file${picked.length - images.length === 1 ? ' is' : 's are'} not a photo and ${picked.length - images.length === 1 ? 'was' : 'were'} skipped.`] : []),
+      ...(images.length > room ? [`Only ${MAX_PHOTOS} photos fit; ${images.length - Math.max(room, 0)} ${images.length - Math.max(room, 0) === 1 ? 'was' : 'were'} not added.`] : []),
+    ]
+    setError(problems.join(' '))
+    setFiles((current) => [...current, ...images].slice(0, MAX_PHOTOS))
   }
 
   return <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}>
@@ -210,7 +219,8 @@ export function CreateInventoryModal({ role, onClose, onCreate, onFinished }: {
           {!reviewed && <p className="admin-inline-note full">Without confirming the specifications, the phone is saved as a draft and stays hidden from customers.</p>}
         </div>
         {error && <div className="admin-error" role="alert">{error}</div>}
-        <div className="admin-form-actions"><button className="button button-outline button-small" type="button" disabled={busy} onClick={() => setStep(1)}>Back</button><button className="button button-primary button-small" type="button" disabled={busy || lookupBusy} onClick={() => void save()}>{busy ? 'Saving…' : 'Save phone'}</button></div>
+        <div className="admin-form-actions"><button className="button button-outline button-small" type="button" disabled={busy} onClick={() => setStep(1)}>Back</button><button className="button button-primary button-small" type="button" disabled={busy || lookupBusy} onClick={() => void save()}>{busy ? 'Saving…' : lookupBusy ? 'Finding specifications…' : 'Save phone'}</button></div>
+        {lookupBusy && <p className="admin-inline-note" role="status">Saving opens up as soon as the search finishes, usually within a minute.</p>}
       </div>}
     </section>
   </div>

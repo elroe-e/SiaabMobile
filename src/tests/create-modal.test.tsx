@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CreateInventoryModal, specRows } from '../../app/admin/inventory/create-modal'
 import { colorHex, splitColors, visibleColors } from '../lib/colors'
 
-vi.mock('../../app/admin/inventory/photo-tools', () => ({
+vi.mock('../../app/admin/inventory/photo-tools', async (importOriginal) => ({
+  isPhotoFile: (await importOriginal<typeof import('../../app/admin/inventory/photo-tools')>()).isPhotoFile,
   preparePhoto: vi.fn(async (file: File) => `data:image/webp;base64,${file.name}`),
   uploadPhoto: vi.fn(async () => undefined),
 }))
@@ -57,7 +58,7 @@ describe('Add phone form', () => {
     expect(body).toMatchObject({ kind: 'new', slug: 'samsung-galaxy-s25', specsReviewed: false, isPublished: false })
     expect(body.variant).toMatchObject({ colorName: 'Black, Blue', ramGb: 12, storageGb: 256, price: 99000 })
     expect(body).not.toHaveProperty('tagline')
-    await waitFor(() => expect(onFinished).toHaveBeenCalledWith('Phone saved as a draft.'))
+    await waitFor(() => expect(onFinished).toHaveBeenCalledWith('Phone saved as a draft without photos.'))
   })
 
   it('publishes once confirmed and uploads the chosen photos to the new phone', async () => {
@@ -72,10 +73,27 @@ describe('Add phone form', () => {
     await screen.findByText('Snapdragon 8 Elite')
     await user.click(screen.getByLabelText(/specifications look right/i))
     await user.click(screen.getByRole('button', { name: 'Save phone' }))
-    await waitFor(() => expect(onFinished).toHaveBeenCalledWith('Phone saved and published.'))
+    await waitFor(() => expect(onFinished).toHaveBeenCalledWith('Phone saved and published with 2 photos.'))
     expect(onCreate.mock.calls[0]![0]).toMatchObject({ specsReviewed: true, isPublished: true })
     expect(vi.mocked(uploadPhoto)).toHaveBeenCalledTimes(2)
     expect(vi.mocked(uploadPhoto).mock.calls[0]).toEqual(['model', 'model-123', 'data:image/webp;base64,front.jpg', 'Samsung Galaxy S25'])
+  })
+
+  it('keeps camera photos that arrive without a file type, and says which files were skipped', async () => {
+    render(<CreateInventoryModal role="owner" onClose={() => undefined} onCreate={async () => ({ modelId: 'm1' })} onFinished={() => undefined} />)
+    fireEvent.change(screen.getByLabelText('Add photos'), { target: { files: [new File(['a'], 'IMG_2041.JPG', { type: '' }), new File(['b'], 'notes.pdf', { type: 'application/pdf' })] } })
+    expect(screen.getByText('Photos (1/8)')).toBeTruthy()
+    expect(screen.getByRole('alert').textContent).toMatch(/1 file is not a photo and was skipped/)
+  })
+
+  it('tells the owner Save is waiting for the search instead of looking broken', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)))
+    render(<CreateInventoryModal role="owner" onClose={() => undefined} onCreate={async () => ({ modelId: 'm1' })} onFinished={() => undefined} />)
+    await fillBasics(user)
+    await user.click(screen.getByRole('button', { name: /find specifications/i }))
+    const save = await screen.findByRole('button', { name: 'Finding specifications…' })
+    expect((save as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('merges the entered RAM and storage into the specifications and shows lookup failures without blocking', async () => {
