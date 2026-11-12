@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "start": "next start",
+    "package:cpanel": "node --env-file=.env.local scripts/package-cpanel.mjs",
     "admin:provision-owner": "node --env-file=.env.local scripts/provision-admin.mjs owner",
     "admin:create-staff": "node --env-file=.env.local scripts/provision-admin.mjs staff"
   },
