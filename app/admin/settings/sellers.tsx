@@ -1,18 +1,19 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, UserMinus } from 'lucide-react'
+import { KeyRound, Plus, UserMinus } from 'lucide-react'
 
 type Seller = { id: string; fullName: string; email: string; createdAt: string }
 const empty = { fullName: '', email: '', password: '' }
 
-/** Owner-only card for adding sellers and removing their access. Sellers sign in at /admin/login. */
+/** Owner-only card for adding sellers, resetting their passwords and removing their access. Sellers sign in at /admin/login. */
 export function SellersCard() {
   const [sellers, setSellers] = useState<Seller[] | null>(null)
   const [form, setForm] = useState(empty)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [reset, setReset] = useState<{ id: string; password: string } | null>(null)
   const load = useCallback(async () => {
     const response = await fetch('/api/admin/team', { cache: 'no-store' })
     const result = await response.json()
@@ -33,12 +34,24 @@ export function SellersCard() {
   }
 
   const remove = async (seller: Seller) => {
-    if (!window.confirm(`Remove ${seller.fullName || seller.email}? They will no longer be able to sign in, and if they are signed in now they are locked out within about an hour. Sales they recorded stay in the history.`)) return
+    if (!window.confirm(`Remove ${seller.fullName || seller.email}? They are signed out right away and can no longer sign in. Sales they recorded stay in the history.`)) return
     setError(''); setNotice('')
     const response = await fetch('/api/admin/team', { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: seller.id }) })
     const result = await response.json()
     if (!response.ok) setError(result.error ?? 'Could not remove the seller.')
-    else { setNotice(`${seller.fullName || seller.email} can no longer sign in. If they are signed in right now, access ends within about an hour.`); await load() }
+    else { setNotice(`${seller.fullName || seller.email} can no longer sign in.`); await load() }
+  }
+
+  const resetPassword = async (event: React.FormEvent<HTMLFormElement>, seller: Seller) => {
+    event.preventDefault()
+    if (!reset) return
+    setBusy(true); setError(''); setNotice('')
+    const response = await fetch('/api/admin/team', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(reset) })
+    const result = await response.json()
+    setBusy(false)
+    if (!response.ok) { setError(result.error ?? 'Could not reset the password.'); return }
+    setReset(null)
+    setNotice(`${seller.fullName || seller.email} has a new password and was signed out everywhere. Give them the new password.`)
   }
 
   return <section className="admin-card" style={{ marginTop: 14 }}>
@@ -55,7 +68,9 @@ export function SellersCard() {
     </form>
     {sellers === null ? (!error && <div className="admin-empty">Loading sellers…</div>) : sellers.length ? <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Seller</th><th>Email</th><th>Added</th><th>Action</th></tr></thead><tbody>{sellers.map((seller) => <tr key={seller.id}>
       <td><strong>{seller.fullName || '—'}</strong></td><td>{seller.email}</td><td>{new Date(seller.createdAt).toLocaleDateString()}</td>
-      <td><button type="button" className="admin-icon-button danger" title="Remove seller" aria-label={`Remove ${seller.fullName || seller.email}`} onClick={() => void remove(seller)}><UserMinus size={14} /></button></td>
+      <td>{reset?.id === seller.id
+        ? <form className="admin-table-actions" onSubmit={(event) => void resetPassword(event, seller)}><input className="admin-input" required type="password" minLength={12} autoComplete="new-password" placeholder="New password (12+)" aria-label={`New password for ${seller.fullName || seller.email}`} value={reset.password} onChange={(event) => setReset({ id: seller.id, password: event.target.value })} /><button className="button button-primary button-small" type="submit" disabled={busy}>Save</button><button className="button button-outline button-small" type="button" onClick={() => setReset(null)}>Cancel</button></form>
+        : <div className="admin-table-actions"><button type="button" className="admin-icon-button" title="Reset password" aria-label={`Reset password for ${seller.fullName || seller.email}`} onClick={() => setReset({ id: seller.id, password: '' })}><KeyRound size={14} /></button><button type="button" className="admin-icon-button danger" title="Remove seller" aria-label={`Remove ${seller.fullName || seller.email}`} onClick={() => void remove(seller)}><UserMinus size={14} /></button></div>}</td>
     </tr>)}</tbody></table></div> : <div className="admin-empty">No sellers yet. Add one above.</div>}
     <a className="button button-outline button-small" href="/admin/activity" style={{ marginTop: 12 }}>Review security activity</a>
   </section>

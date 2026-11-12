@@ -4,8 +4,8 @@ import { LANGUAGE_COOKIE, parseLanguage } from '../src/i18n/language'
 import type { Metadata } from 'next'
 import App from '../src/App'
 import { phones } from '../src/data/phones'
-import { getPublicCatalog } from '../src/lib/supabase/public-catalog'
-import { getPublicStoreData } from '../src/lib/supabase/public-store'
+import { getPublicCatalog } from '../src/lib/db/public-catalog'
+import { getPublicStoreData } from '../src/lib/db/public-store'
 import type { StoreData } from '../src/context/StoreDataContext'
 
 export const dynamic = 'force-dynamic'
@@ -18,7 +18,7 @@ export default async function NotFound() {
   try {
     [catalog, storeData] = await Promise.all([getPublicCatalog(), getPublicStoreData()])
   } catch (error) {
-    console.error('Supabase public data unavailable; rendering editable sample data.', error)
+    console.error('Shop database unavailable; rendering editable sample data.', error)
   }
   return <Suspense fallback={<main className="container page-container" aria-busy="true"><p>Loading Siaab Mobile…</p></main>}><App initialPhones={catalog} initialLang={initialLang} {...(storeData ? { initialStoreData: storeData } : {})} /></Suspense>
 }

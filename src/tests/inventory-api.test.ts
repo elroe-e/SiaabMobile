@@ -3,10 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const state = { existing: null as { id: string; specs_reviewed: boolean } | null, inserted: [] as Record<string, unknown>[][], rpcCalls: [] as Record<string, unknown>[], updates: [] as [string, Record<string, unknown>][], updateError: null as { message: string } | null }
 
-vi.mock('../lib/supabase/auth', () => ({
+vi.mock('../lib/auth/session', () => ({
   requireAdmin: async () => ({
     profile: { role: 'owner' },
-    supabase: {
+    db: {
       from: (table: string) => ({
         select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: table === 'variants' ? { model_id: 'model-9' } : state.existing, error: null }) }) }),
         insert: async (rows: Record<string, unknown>[]) => { state.inserted.push(rows); return { error: null } },

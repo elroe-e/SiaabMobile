@@ -1,27 +1,27 @@
 import { NextResponse } from 'next/server'
 import { Zip, ZipPassThrough } from 'fflate'
-import { requireAdmin } from '../../../../src/lib/supabase/auth'
+import { requireAdmin } from '../../../../src/lib/auth/session'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-async function loadAll(supabase: Awaited<ReturnType<typeof requireAdmin>>['supabase'], table: string, select = '*') {
+async function loadAll(db: Awaited<ReturnType<typeof requireAdmin>>['db'], table: string, select = '*') {
   const rows: unknown[] = []
   for (let offset = 0; ; offset += 1000) {
-    const { data, error } = await supabase.from(table).select(select).range(offset, offset + 999)
+    const { data, error } = await db.from(table).select(select).range(offset, offset + 999)
     if (error) throw new Error(`Could not export ${table}: ${error.message}`)
     rows.push(...(data ?? []))
     if ((data?.length ?? 0) < 1000) return rows
   }
 }
 
-async function listFiles(supabase: Awaited<ReturnType<typeof requireAdmin>>['supabase'], folder = ''): Promise<string[]> {
+async function listFiles(db: Awaited<ReturnType<typeof requireAdmin>>['db'], folder = ''): Promise<string[]> {
   const paths: string[] = []
-  const { data, error } = await supabase.storage.from('phone-photos').list(folder, { limit: 1000, sortBy: { column: 'name', order: 'asc' } })
+  const { data, error } = await db.storage.from('phone-photos').list(folder, { limit: 1000, sortBy: { column: 'name', order: 'asc' } })
   if (error) throw new Error(`Could not list stored photos: ${error.message}`)
   for (const item of data ?? []) {
     const path = folder ? `${folder}/${item.name}` : item.name
-    if (item.id === null) paths.push(...await listFiles(supabase, path))
+    if (item.id === null) paths.push(...await listFiles(db, path))
     else paths.push(path)
   }
   return paths
@@ -29,7 +29,7 @@ async function listFiles(supabase: Awaited<ReturnType<typeof requireAdmin>>['sup
 
 export async function GET() {
   try {
-    const { supabase, user } = await requireAdmin('owner')
+    const { db, user } = await requireAdmin('owner')
     const tables = [
       ['brands', '*'],
       ['phone_models', '*'],
@@ -47,9 +47,9 @@ export async function GET() {
       ['audit_log', '*'],
     ] as const
     const data: Record<string, unknown[]> = {}
-    for (const [table, columns] of tables) data[table] = await loadAll(supabase, table, columns)
+    for (const [table, columns] of tables) data[table] = await loadAll(db, table, columns)
 
-    const storagePaths = await listFiles(supabase)
+    const storagePaths = await listFiles(db)
     const encoder = new TextEncoder()
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
@@ -74,7 +74,7 @@ export async function GET() {
               tables: Object.fromEntries(Object.entries(data).map(([name, rows]) => [name, rows.length])),
             })
             for (const path of storagePaths) {
-              const { data: file, error } = await supabase.storage.from('phone-photos').download(path)
+              const { data: file, error } = await db.storage.from('phone-photos').download(path)
               if (error) throw new Error(`Could not export photo ${path}: ${error.message}`)
               addFile(`phone-photos/${path}`, new Uint8Array(await file.arrayBuffer()))
             }

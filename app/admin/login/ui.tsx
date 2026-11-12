@@ -5,121 +5,48 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { LockKeyhole, Mail, Smartphone } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import type { AuthChangeEvent } from '@supabase/supabase-js'
-import { getBrowserSupabase } from '../../../src/lib/supabase/browser'
-import { getSupabasePublicConfig } from '../../../src/lib/supabase/config'
-import { needsSecondStep } from '../../../src/lib/supabase/mfa'
 
-export function AdminLogin() {
+async function post(url: string, body: unknown) {
+  const response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+  const result = await response.json().catch(() => ({})) as { error?: string; mfa?: boolean }
+  return { ok: response.ok, ...result }
+}
+
+export function AdminLogin({ configured }: { configured: boolean }) {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [setPasswordMode, setSetPasswordMode] = useState(false)
-
   const [busy, setBusy] = useState(false)
-  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null)
+  const [askCode, setAskCode] = useState(false)
   const [mfaCode, setMfaCode] = useState('')
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
-  let configured = true
-  try { getSupabasePublicConfig() } catch { configured = false }
 
-  useEffect(() => {
-    const hash = new URLSearchParams(window.location.hash.slice(1))
-    const params = new URLSearchParams(window.location.search)
-    const authLinkType = hash.get('type')
-    const isPasswordLink = params.get('mode') === 'set-password' || authLinkType === 'invite' || authLinkType === 'recovery'
-    if (isPasswordLink) setSetPasswordMode(true)
-    if (hash.has('error_code')) {
-      const errorCode = hash.get('error_code')
-      setError(errorCode === 'otp_expired'
-        ? 'This invitation or password link has expired or was already used. Request a new link and open it promptly.'
-        : hash.get('error_description')?.replace(/\+/g, ' ') || 'The authentication link could not be verified. Request a new link.')
-    }
+  // Arriving from a page that needs the code step (signed in, code not entered yet).
+  useEffect(() => { if (new URLSearchParams(window.location.search).get('mfa') === '1') setAskCode(true) }, [])
 
-    if (!configured) return
-    const supabase = getBrowserSupabase()
-    if (params.get('mfa') === '1') void askForCodeIfNeeded()
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent) => {
-      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && isPasswordLink)) {
-        setSetPasswordMode(true)
-      }
-    })
-    return () => subscription.unsubscribe()
-  }, [configured])
-
-  const askForCodeIfNeeded = async () => {
-    const supabase = getBrowserSupabase()
-    const { data: level } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-    if (!needsSecondStep(level)) return false
-    const { data: factors } = await supabase.auth.mfa.listFactors()
-    const factorId = factors?.totp?.[0]?.id
-    if (!factorId) return false
-    setMfaFactorId(factorId)
-    return true
-  }
+  const finish = () => { router.replace('/admin'); router.refresh() }
 
   const verifyCode = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!mfaFactorId) return
-    setBusy(true)
-    setError('')
-    const { error: verifyError } = await getBrowserSupabase().auth.mfa.challengeAndVerify({ factorId: mfaFactorId, code: mfaCode.trim() })
-    if (verifyError) {
-      setError(verifyError.message)
-      setBusy(false)
-      return
-    }
-    router.replace('/admin')
-    router.refresh()
+    setBusy(true); setError('')
+    const result = await post('/api/auth/verify', { code: mfaCode.trim() })
+    if (!result.ok) { setError(result.error ?? 'That code did not work.'); setBusy(false); return }
+    finish()
   }
 
   const signIn = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setBusy(true)
-    setError('')
-    const { error: loginError } = await getBrowserSupabase().auth.signInWithPassword({ email: email.trim(), password })
-    if (loginError) {
-      setError(loginError.message)
-      setBusy(false)
-      return
-    }
-    if (await askForCodeIfNeeded()) {
-      setBusy(false)
-      return
-    }
-    router.replace('/admin')
-    router.refresh()
+    setBusy(true); setError('')
+    const result = await post('/api/auth/login', { email: email.trim(), password })
+    if (!result.ok) { setError(result.error ?? 'Could not sign in.'); setBusy(false); return }
+    if (result.mfa) { setAskCode(true); setBusy(false); return }
+    finish()
   }
 
-  const updatePassword = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    setBusy(true)
+  const forgotPassword = () => {
     setError('')
-    const { error: updateError } = await getBrowserSupabase().auth.updateUser({ password: newPassword })
-    if (updateError) {
-      setError(updateError.message)
-      setBusy(false)
-      return
-    }
-    router.replace('/admin')
-    router.refresh()
-  }
-
-  const resetPassword = async () => {
-    if (!email.includes('@')) {
-      setError('Enter your account email first, then choose forgot password.')
-      return
-    }
-    setBusy(true)
-    setError('')
-    const { error: resetError } = await getBrowserSupabase().auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/admin/login?mode=set-password`,
-    })
-    setBusy(false)
-    if (resetError) setError(resetError.message)
-    else setNotice('If an account exists for this email, a password reset link is on its way.')
+    setNotice('Ask the shop owner to set a new password for you in Settings. The owner can reset their own password from the server.')
   }
 
   return <main className="admin-login-page">
@@ -137,21 +64,14 @@ export function AdminLogin() {
     </aside>
     <section className="admin-login-main">
       <div className="admin-login-card">
-        <h2>{mfaFactorId ? 'Enter your code' : setPasswordMode ? 'Set your password' : 'Welcome back'}</h2>
-        <p>{mfaFactorId ? 'Open your authenticator app and type the 6-digit code for Siaab Mobile.' : setPasswordMode ? 'Choose a new password to finish setting up your shop account.' : 'Sign in with your shop account to continue.'}</p>
-        {mfaFactorId ? <form className="admin-login-form" onSubmit={verifyCode}>
+        <h2>{askCode ? 'Enter your code' : 'Welcome back'}</h2>
+        <p>{askCode ? 'Open your authenticator app and type the 6-digit code for Siaab Mobile.' : 'Sign in with your shop account to continue.'}</p>
+        {askCode ? <form className="admin-login-form" onSubmit={verifyCode}>
           <label className="admin-label">6-digit code
             <span className="input-icon-wrap"><LockKeyhole size={14} /><input className="admin-input" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required autoFocus value={mfaCode} onChange={(event) => setMfaCode(event.target.value)} /></span>
           </label>
           {error && <div className="admin-error" role="alert">{error}</div>}
           <button className="button button-primary" type="submit" disabled={busy}>{busy ? 'Please wait…' : 'Verify and continue'}</button>
-        </form> : setPasswordMode ? <form className="admin-login-form" onSubmit={updatePassword}>
-          <label className="admin-label">New password
-            <span className="input-icon-wrap"><LockKeyhole size={14} /><input className="admin-input" autoComplete="new-password" type="password" minLength={12} required value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="At least 12 characters" /></span>
-          </label>
-          {error && <div className="admin-error" role="alert">{error}</div>}
-          {notice && <div className="admin-success" role="status">{notice}</div>}
-          <button className="button button-primary" type="submit" disabled={busy || !configured}>{busy ? 'Please wait…' : 'Save password'}</button>
         </form> : <form className="admin-login-form" onSubmit={signIn}>
           <label className="admin-label">Email address
             <span className="input-icon-wrap"><Mail size={14} /><input className="admin-input" autoComplete="username" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@yourshop.com" /></span>
@@ -163,9 +83,9 @@ export function AdminLogin() {
           {notice && <div className="admin-success" role="status">{notice}</div>}
           <button className="button button-primary" type="submit" disabled={busy || !configured}>{busy ? 'Please wait…' : 'Sign in securely'}</button>
         </form>}
-        <div className="admin-login-help"><Link href="/">Back to storefront</Link>{!setPasswordMode && <button type="button" disabled={busy || !configured} onClick={resetPassword}>Forgot password?</button>}</div>
-        {!configured && <div className="admin-login-config"><strong>Admin is not configured yet.</strong><br />Add the Supabase URL and public anon key to the deployment environment, then apply the database migration and provision the first owner.</div>}
-        <p className="admin-inline-note" style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 20 }}><Smartphone size={12} /> Need access? Ask the shop owner to create your staff account.</p>
+        <div className="admin-login-help"><Link href="/">Back to storefront</Link>{!askCode && <button type="button" disabled={busy} onClick={forgotPassword}>Forgot password?</button>}</div>
+        {!configured && <div className="admin-login-config"><strong>Admin is not configured yet.</strong><br />Add DATABASE_URL to the Node.js app environment variables, restart the app, then create the first owner from the cPanel Terminal.</div>}
+        <p className="admin-inline-note" style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 20 }}><Smartphone size={12} /> Need access? Ask the shop owner to create your seller account.</p>
       </div>
     </section>
   </main>

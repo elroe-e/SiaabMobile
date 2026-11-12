@@ -6,8 +6,8 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import App from '../../src/App'
 import { phones } from '../../src/data/phones'
-import { getPublicCatalog } from '../../src/lib/supabase/public-catalog'
-import { getPublicStoreData } from '../../src/lib/supabase/public-store'
+import { getPublicCatalog } from '../../src/lib/db/public-catalog'
+import { getPublicStoreData } from '../../src/lib/db/public-store'
 import type { StoreData } from '../../src/context/StoreDataContext'
 
 export const dynamic = 'force-dynamic'
@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug?: st
   const alternates = { canonical: `/${slug.join('/')}` }
   if (slug[0] === 'phones' && slug[1]) {
     let catalog = phones
-    try { catalog = await getPublicCatalog() } catch (error) { console.error('Could not load dynamic metadata from Supabase.', error) }
+    try { catalog = await getPublicCatalog() } catch (error) { console.error('Could not load dynamic metadata from the shop database.', error) }
     const phone = catalog.find((item) => item.slug === slug[1])
     if (phone) return {
       title: `${fullPhoneName(phone.brand, phone.model)}`,
@@ -52,7 +52,7 @@ export default async function StorefrontPage({ params }: { params: Promise<{ slu
   try {
     [catalog, storeData] = await Promise.all([getPublicCatalog(), getPublicStoreData()])
   } catch (error) {
-    console.error('Supabase public data unavailable; rendering editable sample data.', error)
+    console.error('Shop database unavailable; rendering editable sample data.', error)
   }
   const path = slug.join('/')
   const isPhonePage = slug[0] === 'phones' && slug.length === 2 && catalog.some((item) => item.slug === slug[1])

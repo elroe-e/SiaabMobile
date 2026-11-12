@@ -1,6 +1,6 @@
 # Siaab Mobile
 
-Siaab Mobile is a responsive phone storefront and protected shop console built with Next.js App Router, React, TypeScript and Supabase. Customers can compare new and used phones, browse upcoming devices, estimate trade-ins and send requests to the shop. Staff can manage stock, reservations, sales and customer requests; owners can also manage store settings, private used-phone fields, trade-in values, audit history and full backups.
+Siaab Mobile is a responsive phone storefront and protected shop console built with Next.js App Router, React, TypeScript and PostgreSQL. Customers can compare new and used phones, browse upcoming devices, estimate trade-ins and send requests to the shop. Staff can manage stock, reservations, sales and customer requests; owners can also manage store settings, private used-phone fields, trade-in values, audit history and full backups.
 
 There is no online checkout or public registration. Purchases are confirmed directly with the shop.
 
@@ -14,7 +14,7 @@ Copy-Item .env.example .env.local
 npm run dev
 ```
 
-The local server prints its URL. With Supabase variables unset, the storefront uses the editable sample catalog and the admin sign-in explains that it is not configured.
+The local server prints its URL. With DATABASE_URL unset, the storefront uses the editable sample catalog and the admin sign-in explains that it is not configured.
 
 Project checks:
 
@@ -26,39 +26,34 @@ npm run build
 npm start
 ```
 
-## Configure Supabase
+## Configure the database
 
-1. Create a Supabase project and copy its project URL and anon/publishable key to `.env.local`:
+The site uses a PostgreSQL database (on cPanel: **PostgreSQL Databases**; the server runs PostgreSQL 10, so the schema avoids newer features). Everything else Supabase used to do now runs inside the site: sign-in with scrypt-hashed passwords and optional authenticator codes, sessions in a secure cookie, and photos stored in a folder on the server.
 
-   ```dotenv
-   NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_KEY
-   NEXT_PUBLIC_SITE_URL=http://localhost:3000
-   ```
-
-2. In the Supabase SQL Editor, run [`supabase/migrations/202610240001_initial_schema.sql`](./supabase/migrations/202610240001_initial_schema.sql), then [`supabase/seed.sql`](./supabase/seed.sql). The migration enables RLS, creates public-safe views, transactional sales/reservation functions, lead throttling, audit logging, photo storage policies and owner-only used-phone fields.
-3. Configure Supabase Auth's Site URL as `http://localhost:3000/admin/login` for local development, and add `http://localhost:3000/**` to the redirect URL allow-list. In production, set the Site URL to the deployed admin login page and allow that site's `/admin/login` path. Invite and password-recovery links return to the admin login, where the user can set a password. Keep public sign-ups disabled; accounts are provisioned only by an owner.
-4. Create the first owner from a trusted local terminal. Add these local-only values to `.env.local` (never to browser variables or a deployed site's environment):
+1. Create a database and a database user with a strong password, and give that user **all privileges** on the database. cPanel prefixes both names with the account name, e.g. `siaabmho_shop`.
+2. Add the connection to the app's environment variables (cPanel: **Setup Node.js App** → the app → **Environment variables**; locally: `.env.local`):
 
    ```dotenv
-   SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY
-   ADMIN_EMAIL=owner@example.com
-   ADMIN_PASSWORD=USE_A_UNIQUE_PASSWORD_OF_AT_LEAST_12_CHARACTERS
-   ADMIN_FULL_NAME=Shop Owner
+   DATABASE_URL=postgres://DB_USER:DB_PASSWORD@localhost:5432/DB_NAME
    ```
 
-   Then run:
+   Characters like `@`, `:` or `/` in the password must be URL-encoded (`@` → `%40`).
+3. Restart the app and open `/api/health` once. On first start the site creates its tables (see [`src/lib/db/schema.ts`](./src/lib/db/schema.ts)) and fills the trade-in price list. Later schema changes are added as new entries in [`src/lib/db/migrate.ts`](./src/lib/db/migrate.ts) and apply on the next start.
+4. Create the owner. In cPanel **Terminal**:
 
    ```sh
-   npm run admin:provision-owner
+   source ~/nodevenv/siaabmobile/20/bin/activate && cd ~/siaabmobile
+   node set-owner.mjs
    ```
 
-   The script creates the Auth user if needed and assigns the owner profile through the service-role API. Do not share or commit `.env.local`. The service-role key bypasses RLS and must never be added to a `NEXT_PUBLIC_*` variable.
-5. Open `/admin/login`. Owners can provision individual staff accounts from a trusted terminal by changing `ADMIN_EMAIL`, `ADMIN_PASSWORD` and `ADMIN_FULL_NAME` in `.env.local`, then running `npm run admin:create-staff`. There is deliberately no public sign-up screen.
+   It asks for the database address (the same `DATABASE_URL`), the owner's email, name and password. Run it again any time to reset the owner's password; add `--remove-two-factor` if the owner lost their authenticator phone.
+5. Sign in at `/admin/login`. Sellers are added, reset and removed by the owner in **Settings → Sellers**. There is no public sign-up.
 
-To run the database role checks locally, install the Supabase CLI and Docker, then run `supabase start` followed by `supabase test db`. [`supabase/tests/rls.sql`](./supabase/tests/rls.sql) checks staff/owner separation and confidential used-unit fields in a rollback-only transaction. Never use production customer data for the test.
+Photos are saved in `~/siaab-photos` (outside the app folder, so deploys never delete them). Set `PHOTOS_DIR` to use another folder.
 
-The Supabase free plan currently includes 500 MB database storage, 1 GB file storage and pauses inactive projects after one week; quotas and plan terms can change. Keep photos optimized, monitor the owner-only storage meter, and review the provider's current limits before launch.
+With `DATABASE_URL` unset the storefront shows the editable sample catalog and the admin sign-in explains what is missing.
+
+Tests run the real schema in an in-memory PostgreSQL ([PGlite](https://pglite.dev)), including the permission checks: [`src/tests/database.test.ts`](./src/tests/database.test.ts) and [`src/tests/team-api.test.ts`](./src/tests/team-api.test.ts).
 
 ## Admin capabilities
 
@@ -68,30 +63,29 @@ The Supabase free plan currently includes 500 MB database storage, 1 GB file sto
 - **Leads:** triage trade-in, contact and notify-me requests, save internal notes, and contact customers by phone or WhatsApp.
 - **Owner-only settings:** shop details, sold badge period, low-stock threshold, trade-in rules/base values, private used-unit cost/IMEI/notes, audit history and full ZIP export.
 
-Only owners can access settings, audit data, export, or private cost/IMEI fields. Staff and public catalog queries use restricted columns/views. Keep the database migration policies in place; do not replace authenticated queries with a service-role client.
+Only owners can access settings, audit data, export, or private cost/IMEI fields. Staff and public catalog queries use restricted columns/views. Every signed-in query tells the database who is acting, so its own checks still apply: sellers cannot read or set cost price, IMEI or private notes, and only owners can undo a sale older than 24 hours.
 
 ## Specification lookup
 
 The admin suggestion flow uses the bundled review-required library, Wikipedia and pasted text; optional Gemini lookup is last and is only enabled when `GEMINI_API_KEY` is supplied. The flow normalizes, validates, flags implausible values, preserves locked/known fields and requires a human review before storefront publication. Provider output is a suggestion, not a verified specification. Pasting manufacturer information is available when external sources fail.
 
-## Backups and keep-alive
+## Backups
 
-- Owners can download **Export everything** from Admin → Settings. The ZIP contains JSON records, customer requests, audit history, private used-unit data and uploaded photos. Treat it as sensitive personal data; store it encrypted and restrict access.
-- Download and verify a backup at least monthly, before major data changes, and before changing providers. The Supabase free plan does not include managed daily backups.
-- The GitHub Actions workflow [`.github/workflows/keep-supabase-alive.yml`](./.github/workflows/keep-supabase-alive.yml) checks the deployed health endpoint every three days. Set repository variable `SITE_URL` to the deployed origin and enable Actions. Scheduled workflows are best-effort; monitor runs and verify the Supabase project remains active.
+- Owners can download **Export everything** from Admin → Settings. The ZIP contains JSON records, customer requests, audit history, private used-unit data and uploaded photos. Treat it as sensitive personal data; store it encrypted and restrict access. It never contains passwords or authenticator secrets.
+- cPanel's **JetBackup** also backs up the database and the `~/siaab-photos` folder. Download and verify a backup at least monthly and before major changes.
 
-## Deploy on Netlify
+## Deploy on cPanel
 
-Netlify's current OpenNext adapter supports this app's App Router, middleware and route handlers with automatic framework detection. No Vercel Hobby deployment is required.
+The site runs as a Node.js app on cPanel and deploys itself from GitHub.
 
-1. Push the project to a Git provider and import it into Netlify.
-2. Use `npm run build` as the build command. Netlify detects Next.js automatically.
-3. Configure `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `NEXT_PUBLIC_SITE_URL` in the Netlify environment settings for the production context. Add `GEMINI_API_KEY` only if you intend to use the optional AI lookup.
-4. Do **not** add `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_PASSWORD`, or other provisioning secrets to the Netlify site. Provision accounts locally.
-5. Set the deployed origin as the Supabase Auth site URL/allowed redirect URL and as the GitHub Actions `SITE_URL` repository variable.
-6. Deploy and verify `/api/health`, `/admin/login`, public catalog data and customer request submissions.
+1. cPanel → **Setup Node.js App** → create an app: Node.js 20, Production, application root `siaabmobile`, the site's domain, startup file `server.js`. Add `DATABASE_URL`, `NEXT_PUBLIC_SITE_URL` and (optionally) `GEMINI_API_KEY` as environment variables. Do not press "Run NPM Install"; the upload includes its own trimmed `node_modules`.
+2. cPanel → **FTP Accounts**: create an account whose directory is `siaabmobile`.
+3. GitHub → repository **Settings → Secrets and variables → Actions**: add `FTP_SERVER` (the server's host name), `FTP_USERNAME` and `FTP_PASSWORD`.
+4. Every push to `main` runs [`.github/workflows/deploy-cpanel.yml`](./.github/workflows/deploy-cpanel.yml): it builds the site in standalone mode, uploads it over FTPS and touches `tmp/restart.txt` so cPanel restarts the app. Without the FTP secrets the workflow skips quietly.
+5. cPanel → **SSL/TLS Status** → **Run AutoSSL** for HTTPS.
+6. Verify `/api/health`, `/admin/login`, the catalog and a customer request.
 
-Netlify's Free plan currently has usage credits and project/account limits; Netlify's plan terms, commercial eligibility and Supabase quotas can change. Check both providers' current terms and usage before relying on a no-cost production deployment. See [Netlify Next.js support](https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/overview/), [Netlify pricing](https://www.netlify.com/pricing/) and [Supabase pricing](https://supabase.com/pricing).
+To upload by hand instead, run `npm run package:cpanel`; it writes `siaabmobile-cpanel.zip` to extract into the app folder.
 
 ## Editable sample data and contact details
 
@@ -100,16 +94,16 @@ Netlify's Free plan currently has usage credits and project/account limits; Netl
 - Sample trade-in values: [`src/data/tradeInValues.ts`](./src/data/tradeInValues.ts)
 - Sample trade-in logic: [`src/lib/tradeIn.ts`](./src/lib/tradeIn.ts)
 - Sample shop details: [`src/data/shop.ts`](./src/data/shop.ts)
-- Supabase schema and sample records: [`supabase/`](./supabase)
+- Database design: [`src/lib/db/schema.ts`](./src/lib/db/schema.ts)
 
 All sample prices, stock, warranties, device details, trade-in values, upcoming dates and expected prices are illustrative. Verify them before publication. See [`ASSUMPTIONS.md`](./ASSUMPTIONS.md).
 
 ## Stack
 
 - Next.js 15 App Router, React 18, TypeScript and Tailwind CSS.
-- Supabase Postgres, Auth and Storage, with RLS and server-side API validation.
+- PostgreSQL through `pg`; the site's own sign-in (scrypt passwords, authenticator codes, database-backed sessions); photos on the server disk.
 - Recharts, Lucide icons, Zod, Vitest and Testing Library.
-- Netlify as the documented free-tier Next.js host; provider plans and usage quotas are subject to change.
+- cPanel Setup Node.js App, deployed by GitHub Actions over FTPS.
 
 ## Adding a phone (admin)
 
@@ -125,16 +119,16 @@ Photos chosen in step 1 are shrunk to WebP (under 200 KB) and uploaded as soon a
 Wikipedia rarely has articles for phones released in the last year, so for new models the optional Google AI source does most of the work. It uses Google's free Gemini API:
 
 1. Create a free key at Google AI Studio (aistudio.google.com) with the shop's Google account.
-2. Add it to the host's environment variables as `GEMINI_API_KEY` (SmarterASP.NET: Node.js project → **Environment Variables**), then redeploy. Never put the key in the repository or in chat.
+2. Add it to the host's environment variables as `GEMINI_API_KEY` (cPanel: Setup Node.js App → the app → **Environment variables**), then redeploy. Never put the key in the repository or in chat.
 3. The app picks Google's newest stable Flash model on its own (it starts with `gemini-flash-latest` and, if Google has retired a name, asks which models your key can use). Set `GEMINI_MODEL` only to force a specific model.
 
 Free-tier limits apply; when Google answers "busy", wait a minute or paste the specifications instead. AI-found specifications are suggestions: always check them before ticking the confirmation box.
 
 ## Two-factor sign-in (optional)
 
-Admin → Settings → **Two-factor sign-in** → *Turn on two-factor*. Scan the QR code with Google Authenticator, Microsoft Authenticator or Authy and enter the 6-digit code. From then on sign-in asks for a code after the password. The card is in the owner's Settings page, so it protects the owner account; staff accounts keep signing in with a password.
+Admin → Settings → **Two-factor sign-in** → *Turn on two-factor*. Scan the QR code with Google Authenticator, Microsoft Authenticator or Authy and enter the 6-digit code. From then on sign-in asks for a code after the password. The card is in the owner's Settings page, so it protects the owner account; seller accounts keep signing in with a password.
 
-Lost the phone? In the Supabase dashboard open **Authentication → Users**, pick the account and delete its authenticator factor; the account then signs in with just the password again.
+Lost the phone? In cPanel Terminal run `node set-owner.mjs --remove-two-factor` in the app folder (see *Configure the database*); it sets a new password and turns two-factor off.
 
 ## Languages
 

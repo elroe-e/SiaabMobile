@@ -1,16 +1,17 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { getSupabasePublicConfig, isSupabaseConfigured } from '../../../src/lib/supabase/config'
+import { createDbClient } from '../../../src/lib/db/client'
+import { isDatabaseConfigured } from '../../../src/lib/db/pool'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  if (!isSupabaseConfigured) {
-    return NextResponse.json({ status: 'ok', supabase: 'not_configured' }, { headers: { 'cache-control': 'no-store' } })
+  if (!isDatabaseConfigured) {
+    return NextResponse.json({ status: 'ok', database: 'not_configured' }, { headers: { 'cache-control': 'no-store' } })
   }
-  const { url, key } = getSupabasePublicConfig()
-  const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
-  const { error } = await supabase.from('public_shop_settings').select('name').limit(1)
-  if (error) return NextResponse.json({ status: 'error', supabase: 'unavailable' }, { status: 503, headers: { 'cache-control': 'no-store' } })
-  return NextResponse.json({ status: 'ok', supabase: 'connected' }, { headers: { 'cache-control': 'no-store' } })
+  const { error } = await createDbClient().from('public_shop_settings').select('name').limit(1)
+  if (error) {
+    console.error('Health check could not reach the database', error.message)
+    return NextResponse.json({ status: 'error', database: 'unavailable' }, { status: 503, headers: { 'cache-control': 'no-store' } })
+  }
+  return NextResponse.json({ status: 'ok', database: 'connected' }, { headers: { 'cache-control': 'no-store' } })
 }
