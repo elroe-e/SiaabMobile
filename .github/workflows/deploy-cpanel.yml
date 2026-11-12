@@ -1,6 +1,6 @@
 name: Deploy to cPanel
 
-# Every push to main builds the site and uploads it to the cPanel Node.js app over FTPS.
+# Every push to main builds the site and ships it to the cPanel Node.js app over SSH as one archive.
 on:
   push:
     branches: [main]
@@ -17,11 +17,11 @@ jobs:
       - name: Check deploy settings
         id: ready
         env:
-          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
         run: |
-          # Until the FTP secrets are added, skip quietly instead of failing every push.
-          if [ -z "$FTP_SERVER" ]; then
-            echo "Add FTP_SERVER, FTP_USERNAME and FTP_PASSWORD as repository secrets to turn on deploys."
+          # Until the SSH secrets are added, skip quietly instead of failing every push.
+          if [ -z "$SSH_HOST" ]; then
+            echo "Add SSH_HOST, SSH_USER and SSH_PRIVATE_KEY secrets and the SSH_KNOWN_HOSTS variable to turn on deploys."
             echo "go=false" >> "$GITHUB_OUTPUT"
           else
             echo "go=true" >> "$GITHUB_OUTPUT"
@@ -43,21 +43,44 @@ jobs:
         run: |
           npm ci
           node scripts/package-cpanel.mjs --no-zip
-          # cPanel restarts the Node.js app whenever tmp/restart.txt changes.
-          mkdir -p .next/standalone/tmp
-          date -u > .next/standalone/tmp/restart.txt
+          tar -czf site.tar.gz -C .next/standalone .
 
-      - name: Upload to cPanel
+      - name: Upload and switch over
         if: steps.ready.outputs.go == 'true'
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftps
-          local-dir: ./.next/standalone/
-          server-dir: ./
-          # The default exclude list drops node_modules, but the standalone server needs its trimmed copy.
-          exclude: |
-            **/.git*
-            **/.git*/**
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ vars.SSH_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          # Pinned host key: refuse to talk to anything but the real server.
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh_opts="-i $HOME/.ssh/deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes"
+          scp $ssh_opts site.tar.gz "$SSH_USER@$SSH_HOST:siaab-deploy.tar.gz"
+          # Unpack beside the live app, then swap folders and restart, so visitors never see half-copied files.
+          ssh $ssh_opts "$SSH_USER@$SSH_HOST" 'set -e
+            rm -rf ~/siaabmobile-new ~/siaabmobile-old
+            mkdir ~/siaabmobile-new
+            tar -xzf ~/siaab-deploy.tar.gz -C ~/siaabmobile-new
+            mkdir -p ~/siaabmobile-new/tmp
+            mv ~/siaabmobile ~/siaabmobile-old
+            mv ~/siaabmobile-new ~/siaabmobile
+            touch ~/siaabmobile/tmp/restart.txt
+            rm -rf ~/siaabmobile-old ~/siaab-deploy.tar.gz
+            echo "Deployed $(date -u)"'
+          rm -f ~/.ssh/deploy
+
+      - name: Check the live site
+        if: steps.ready.outputs.go == 'true'
+        env:
+          SITE: ${{ vars.SITE_URL || 'https://siaabmobile.com' }}
+        run: |
+          # The first request after a restart starts the app, so give it a few tries.
+          for attempt in 1 2 3 4 5 6; do
+            if curl --fail --silent --show-error --max-time 30 "$SITE/api/health"; then echo; exit 0; fi
+            sleep 10
+          done
+          echo "The site did not answer /api/health. Check the Node.js app's stderr.log in cPanel."
+          exit 1

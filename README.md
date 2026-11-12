@@ -79,10 +79,10 @@ The admin suggestion flow uses the bundled review-required library, Wikipedia an
 The site runs as a Node.js app on cPanel and deploys itself from GitHub.
 
 1. cPanel → **Setup Node.js App** → create an app: Node.js 20, Production, application root `siaabmobile`, the site's domain, startup file `server.js`. Add `DATABASE_URL`, `NEXT_PUBLIC_SITE_URL` and (optionally) `GEMINI_API_KEY` as environment variables. Do not press "Run NPM Install"; the upload includes its own trimmed `node_modules`.
-2. cPanel → **FTP Accounts**: create an account whose directory is `siaabmobile`.
-3. GitHub → repository **Settings → Secrets and variables → Actions**: add `FTP_SERVER` (the server's host name), `FTP_USERNAME` and `FTP_PASSWORD`.
-4. Every push to `main` runs [`.github/workflows/deploy-cpanel.yml`](./.github/workflows/deploy-cpanel.yml): it builds the site in standalone mode, uploads it over FTPS and touches `tmp/restart.txt` so cPanel restarts the app. Without the FTP secrets the workflow skips quietly.
-5. cPanel → **SSL/TLS Status** → **Run AutoSSL** for HTTPS.
+2. cPanel → **SSH Access** → Manage SSH Keys: import a deploy key's public half and **Authorize** it.
+3. GitHub → repository **Settings → Secrets and variables → Actions**: secrets `SSH_HOST`, `SSH_USER` (the cPanel user) and `SSH_PRIVATE_KEY`; variables `SSH_KNOWN_HOSTS` (from `ssh-keyscan -t ed25519 HOST`) and `SITE_URL`.
+4. Every push to `main` runs [`.github/workflows/deploy-cpanel.yml`](./.github/workflows/deploy-cpanel.yml): it builds the site in standalone mode, copies it over SSH as one archive, unpacks it beside the live folder, swaps the folders, restarts the app and checks `/api/health`. Without the SSH secrets the workflow skips quietly. (File-by-file FTP was too slow for the first upload and was cut off by the server.)
+5. HTTPS: the host issues a Let's Encrypt certificate automatically; turn on **Force HTTPS Redirect** in cPanel → Domains. Sign-in cookies require HTTPS.
 6. Verify `/api/health`, `/admin/login`, the catalog and a customer request.
 
 To upload by hand instead, run `npm run package:cpanel`; it writes `siaabmobile-cpanel.zip` to extract into the app folder.
