@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { requireAdmin } from '../../../../src/lib/supabase/auth'
+import { requireAdmin } from '../../../../src/lib/auth/session'
 import { fetchSpecs } from '../../../../src/lib/specs/orchestrator'
 import type { NormalizedSpecs, SpecMeta } from '../../../../src/lib/specs/types'
 
@@ -15,17 +15,17 @@ export async function POST(request: Request) {
   const parsed = bodySchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Provide a brand and model name.' }, { status: 400 })
   try {
-    const { supabase } = await requireAdmin()
+    const { db } = await requireAdmin()
     let existing: Record<string, unknown> = {}
     let metadata: Record<string, SpecMeta> = {}
     if (parsed.data.modelId) {
-      const { data, error } = await supabase.from('phone_models').select('specs,spec_meta').eq('id', parsed.data.modelId).maybeSingle()
+      const { data, error } = await db.from('phone_models').select('specs,spec_meta').eq('id', parsed.data.modelId).maybeSingle()
       if (error) return NextResponse.json({ error: `Could not read saved specs: ${error.message}` }, { status: 500 })
       existing = (data?.specs ?? {}) as Record<string, unknown>
       metadata = (data?.spec_meta ?? {}) as Record<string, SpecMeta>
     }
     const lockedFields = Object.entries(metadata).filter(([, value]) => value.locked).map(([field]) => field as keyof NormalizedSpecs)
-    const { data: modelData, error: lookupError } = await supabase
+    const { data: modelData, error: lookupError } = await db
       .from('phone_models')
       .select('specs')
       .ilike('name', parsed.data.model)

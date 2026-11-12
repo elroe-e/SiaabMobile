@@ -5,12 +5,12 @@
 - Upcoming device dates, expected-price ranges and specifications are explicitly unconfirmed placeholders. Update them in Admin → Inventory and keep the storefront disclaimer visible.
 - ETB is the assumed display currency. The current sample artwork is generated SVG and is not a photograph of a specific item. Upload only appropriately licensed images.
 - Trade-in estimates are approximate; the final offer follows in-person inspection. Review all multipliers, issue penalties and base values with the shop owner before accepting requests.
-- Customer contact details and request payloads are stored in Supabase only after a successful lead submission. Public forms also prepare a WhatsApp message for the customer to review and send. The database applies a per-contact request limit.
-- Supabase is the source of truth when configured and seeded. If it is not configured or cannot be reached, the public page renders editable sample data; the health endpoint reports database unavailability.
+- Customer contact details and request payloads are stored in the shop database only after a successful lead submission. Public forms also prepare a WhatsApp message for the customer to review and send. The database applies a per-contact request limit.
+- The PostgreSQL database is the source of truth when DATABASE_URL is set. If it is not set or cannot be reached, the public page renders editable sample data; the health endpoint reports database unavailability.
 - There is no online payment, public account registration or anonymous access to private inventory. Staff accounts are created by the owner from a trusted terminal; the service-role key is never needed by the deployed site.
 - Owner exports contain personal data and confidential information, including leads, audit records, used-unit costs and IMEIs. Store exports encrypted, limit access and follow applicable privacy/retention requirements.
 - Free hosting/database tiers have quotas, pausing behavior and terms that can change. Review current provider terms, usage and commercial eligibility before launch; free-tier availability is not a guarantee of uninterrupted service.
-- The production origin defaults to `https://siaabmobile.com`. Update `NEXT_PUBLIC_SITE_URL`, Supabase Auth's allowed URLs, Netlify environment settings and the GitHub Actions `SITE_URL` variable for the actual domain.
+- The production origin defaults to `https://siaabmobile.com`. Update `NEXT_PUBLIC_SITE_URL` in the cPanel app settings and the GitHub Actions `SITE_URL` variable if the domain changes.
 - Phone pages show two short promises under the price ("Pay in store", "Check the phone in person before you buy"). They are assumptions about shop policy; edit `src/data/assurances.ts`.
 - Amharic wording was written without a native review and must be checked before launch. Product names, specifications and the admin panel stay in English.
 - Adding a phone still needs a price and a quantity in addition to brand, model, colour, RAM and storage, because the storefront cannot list or sell a phone without them.
@@ -18,6 +18,8 @@
 - Each phone model shows as one card on the shop. Its price is the lowest variant price and its stock count is the total across colours and storage options.
 - Automatic spec lookup can only be as good as its free sources. Wikipedia and the saved library cover older phones; recent phones need the optional `GEMINI_API_KEY` or pasted specifications. Specifications are never published until the owner ticks the confirmation.
 - The backup reminder is stored per browser (localStorage); it cannot know about backups taken on another device.
-- Two-factor sign-in uses Supabase Auth TOTP and is off until a person enables it. If Supabase cannot report the sign-in assurance level, the check lets the sign-in through rather than locking the owner out.
+- Two-factor sign-in uses standard authenticator codes (RFC 6238, 30-second steps, one step of clock drift allowed) and is off until a person enables it. Turning it off needs a current code; the owner can also reset it from the server with `node set-owner.mjs --remove-two-factor`.
+- Forgotten passwords are reset by the owner (sellers, in Settings) or from the server Terminal (the owner). There is no email reset.
+- Sign-in allows 8 wrong passwords per email and 30 per network address in 15 minutes, and 8 wrong codes per account, before pausing.
 - The repository migration includes a trigger (`phone_models_review_gate`) that refuses to save an "available" phone whose specifications are unconfirmed. Your live database does not enforce it (the first 13 phones were saved unconfirmed). If you re-create the database from the migration, saving a draft phone from the Add form will be rejected until the specifications are confirmed; tick the confirmation box in step 2.
 - Existing phones can be given a colour, and their specifications confirmed, from the pencil (Edit) button on their inventory row.

@@ -18,11 +18,10 @@ jobs:
         id: ready
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
-          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
         run: |
-          # Until the secrets are added, skip quietly instead of failing every push.
-          if [ -z "$FTP_SERVER" ] || [ -z "$SUPABASE_URL" ]; then
-            echo "Add FTP_SERVER, FTP_USERNAME, FTP_PASSWORD, NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY as repository secrets to turn on deploys."
+          # Until the FTP secrets are added, skip quietly instead of failing every push.
+          if [ -z "$FTP_SERVER" ]; then
+            echo "Add FTP_SERVER, FTP_USERNAME and FTP_PASSWORD as repository secrets to turn on deploys."
             echo "go=false" >> "$GITHUB_OUTPUT"
           else
             echo "go=true" >> "$GITHUB_OUTPUT"
@@ -40,12 +39,10 @@ jobs:
       - name: Build the self-contained site
         if: steps.ready.outputs.go == 'true'
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_SITE_URL: ${{ vars.SITE_URL || 'https://siaabmobile.com' }}
         run: |
           npm ci
-          node scripts/package-cpanel.mjs
+          node scripts/package-cpanel.mjs --no-zip
           # cPanel restarts the Node.js app whenever tmp/restart.txt changes.
           mkdir -p .next/standalone/tmp
           date -u > .next/standalone/tmp/restart.txt

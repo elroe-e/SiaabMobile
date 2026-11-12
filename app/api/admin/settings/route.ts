@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { requireAdmin } from '../../../../src/lib/supabase/auth'
+import { requireAdmin } from '../../../../src/lib/auth/session'
 
 const tradeConfigSchema = z.object({
   condition: z.object({ like_new: z.number().min(0).max(2), good: z.number().min(0).max(2), fair: z.number().min(0).max(2), poor: z.number().min(0).max(2) }),
@@ -29,11 +29,11 @@ const settingsSchema = z.object({
 
 export async function GET() {
   try {
-    const { supabase } = await requireAdmin('owner')
+    const { db } = await requireAdmin('owner')
     const [settings, config, values] = await Promise.all([
-      supabase.from('shop_settings').select('*').eq('id', 1).single(),
-      supabase.from('trade_in_config').select('config,updated_at').eq('id', 1).single(),
-      supabase.from('trade_in_values').select('id,brand_text,model_text,storage_gb,base_value,is_active').order('brand_text').order('model_text'),
+      db.from('shop_settings').select('*').eq('id', 1).single(),
+      db.from('trade_in_config').select('config,updated_at').eq('id', 1).single(),
+      db.from('trade_in_values').select('id,brand_text,model_text,storage_gb,base_value,is_active').order('brand_text').order('model_text'),
     ])
     const error = settings.error ?? config.error ?? values.error
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -49,7 +49,7 @@ export async function PATCH(request: Request) {
   const parsed = settingsSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid settings.' }, { status: 400 })
   try {
-    const { supabase } = await requireAdmin('owner')
+    const { db } = await requireAdmin('owner')
     const { tradeConfig, soldBadgeDays, lowStockDefault, ...basic } = parsed.data
     const settings = {
       ...basic,
@@ -58,11 +58,11 @@ export async function PATCH(request: Request) {
       updated_at: new Date().toISOString(),
     }
     if (Object.keys(settings).length > 1) {
-      const { error } = await supabase.from('shop_settings').update(settings).eq('id', 1)
+      const { error } = await db.from('shop_settings').update(settings).eq('id', 1)
       if (error) return NextResponse.json({ error: `Shop settings were not saved: ${error.message}` }, { status: 400 })
     }
     if (tradeConfig) {
-      const { error } = await supabase.from('trade_in_config').upsert({ id: 1, config: tradeConfig, updated_at: new Date().toISOString() })
+      const { error } = await db.from('trade_in_config').upsert({ id: 1, config: tradeConfig, updated_at: new Date().toISOString() })
       if (error) return NextResponse.json({ error: `Shop details saved, but trade-in settings were not: ${error.message}` }, { status: 400 })
     }
     return NextResponse.json({ ok: true })

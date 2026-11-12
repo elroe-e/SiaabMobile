@@ -1,13 +1,13 @@
 import type { Metadata } from 'next'
 import { AdminShell } from '../admin-shell'
-import { requireAdmin } from '../../../src/lib/supabase/auth'
+import { requireAdminPage } from '../../../src/lib/auth/session'
 
 export const metadata: Metadata = { title: 'Security activity' }
 export const dynamic = 'force-dynamic'
 
 export default async function ActivityPage() {
-  const { supabase, profile } = await requireAdmin('owner')
-  const { data, error } = await supabase.from('audit_log').select('id,user_id,action,table_name,record_id,before,after,created_at').order('created_at', { ascending: false }).limit(300)
+  const { db, profile } = await requireAdminPage('owner')
+  const { data, error } = await db.from('audit_log').select('id,user_id,action,table_name,record_id,before,after,created_at').order('created_at', { ascending: false }).limit(300)
   if (error) throw new Error(`Could not load activity: ${error.message}`)
   return <AdminShell name={profile.full_name} role={profile.role}>
     <div className="admin-page-heading"><div><h2>Security activity</h2><p>Owner-only history of inventory, shop settings and trade-in changes.</p></div><span className="admin-badge">{data.length} recent events</span></div>

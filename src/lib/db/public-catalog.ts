@@ -1,7 +1,8 @@
 import 'server-only'
-import { createClient } from '@supabase/supabase-js'
+import { createDbClient } from './client'
+import { photoUrl } from './photos'
 import { phones as samplePhones, placeholderImages } from '../../data/phones'
-import { getSupabasePublicConfig, isSupabaseConfigured } from './config'
+import { isDatabaseConfigured } from './pool'
 import type { Phone } from '../../types'
 
 type PublicModel = {
@@ -47,7 +48,7 @@ type PublicModelPhoto = { model_id: string; path: string; alt_text: string; sort
 const getString = (value: unknown, fallback = 'Not specified') => typeof value === 'string' && value ? value : fallback
 const getNumber = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : undefined
 
-function toPhone(model: PublicModel, variant: PublicVariant, photos: PublicModelPhoto[], publicUrl: string, modelVariants: Map<string, PublicVariant[]>): Phone {
+function toPhone(model: PublicModel, variant: PublicVariant, photos: PublicModelPhoto[], modelVariants: Map<string, PublicVariant[]>): Phone {
   const modelPhotos = photos.filter((photo) => photo.model_id === model.id).sort((a, b) => a.sort_order - b.sort_order)
   const storageVariants = modelVariants.get(model.id) ?? [variant]
   const totalStock = storageVariants.reduce((sum, item) => sum + item.stock_count, 0)
@@ -72,7 +73,7 @@ function toPhone(model: PublicModel, variant: PublicVariant, photos: PublicModel
     }
     return groups
   }, {})
-  const imagePaths = modelPhotos.length ? modelPhotos.map((photo) => `${publicUrl}/storage/v1/object/public/phone-photos/${photo.path}`) : []
+  const imagePaths = modelPhotos.length ? modelPhotos.map((photo) => photoUrl(photo.path)) : []
   const imageSet = imagePaths.length ? imagePaths : samplePhones.find((phone) => phone.slug === model.slug)?.images ?? placeholderImages(model.slug)
   return {
     id: variant.id,
@@ -109,17 +110,16 @@ function toPhone(model: PublicModel, variant: PublicVariant, photos: PublicModel
 }
 
 export async function getPublicCatalog(): Promise<Phone[]> {
-  if (!isSupabaseConfigured) return samplePhones
-  const { url, key } = getSupabasePublicConfig()
-  const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+  if (!isDatabaseConfigured) return samplePhones
+  const db = createDbClient()
   const [modelsResult, variantsResult, photosResult, unitsResult] = await Promise.all([
-    supabase.from('public_models').select('*').eq('status', 'available'),
-    supabase.from('public_variants').select('*'),
-    supabase.from('public_model_photos').select('*'),
-    supabase.from('public_used_units').select('*'),
+    db.from('public_models').select('*').eq('status', 'available'),
+    db.from('public_variants').select('*'),
+    db.from('public_model_photos').select('*'),
+    db.from('public_used_units').select('*'),
   ])
   const errors = [modelsResult.error, variantsResult.error, photosResult.error, unitsResult.error].filter(Boolean)
-  if (errors.length) throw new Error(`Could not load the public Supabase catalog: ${errors.map((error) => error?.message).join('; ')}`)
+  if (errors.length) throw new Error(`Could not load the shop catalog: ${errors.map((error) => error?.message).join('; ')}`)
   const models = (modelsResult.data ?? []) as PublicModel[]
   const variants = (variantsResult.data ?? []) as PublicVariant[]
   const photos = (photosResult.data ?? []) as PublicModelPhoto[]
@@ -133,12 +133,12 @@ export async function getPublicCatalog(): Promise<Phone[]> {
   // One card per phone model, led by its cheapest variant; colours and storage options are gathered inside toPhone.
   const newPhones = models.flatMap((model) => {
     const cheapest = [...(modelVariants.get(model.id) ?? [])].sort((a, b) => Number(a.price) - Number(b.price))[0]
-    return cheapest ? [toPhone(model, cheapest, photos, url, modelVariants)] : []
+    return cheapest ? [toPhone(model, cheapest, photos, modelVariants)] : []
   })
   const usedPhones = units.map((unit): Phone | null => {
     const model = models.find((item) => item.id === unit.model_id)
     if (!model) return null
-    const imagePaths = unit.photos.map((photo) => `${url}/storage/v1/object/public/phone-photos/${photo.path}`)
+    const imagePaths = unit.photos.map((photo) => photoUrl(photo.path))
     const images = imagePaths.length ? imagePaths : samplePhones.find((phone) => phone.slug === model.slug)?.images ?? placeholderImages(model.slug)
     return {
       id: unit.id, slug: `${model.slug}-used-${unit.id}`, brand: model.brand, model: model.name,

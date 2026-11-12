@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { requireAdmin } from '../../../../src/lib/supabase/auth'
+import { requireAdmin } from '../../../../src/lib/auth/session'
 
 const updateSchema = z.object({
   id: z.string().uuid(),
@@ -10,8 +10,8 @@ const updateSchema = z.object({
 
 export async function GET() {
   try {
-    const { supabase } = await requireAdmin()
-    const { data, error } = await supabase.from('leads').select('id,type,name,contact,payload,status,created_at').order('created_at', { ascending: false }).limit(500)
+    const { db } = await requireAdmin()
+    const { data, error } = await db.from('leads').select('id,type,name,contact,payload,status,created_at').order('created_at', { ascending: false }).limit(500)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ leads: data ?? [] }, { headers: { 'cache-control': 'no-store' } })
   } catch (error) {
@@ -26,8 +26,8 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: parsed.success ? 'No request changes provided.' : parsed.error.issues[0]?.message }, { status: 400 })
   }
   try {
-    const { supabase } = await requireAdmin()
-    const { data: lead, error: readError } = await supabase.from('leads').select('payload').eq('id', parsed.data.id).maybeSingle()
+    const { db } = await requireAdmin()
+    const { data: lead, error: readError } = await db.from('leads').select('payload').eq('id', parsed.data.id).maybeSingle()
     if (readError) return NextResponse.json({ error: readError.message }, { status: 500 })
     if (!lead) return NextResponse.json({ error: 'Customer request not found.' }, { status: 404 })
     const { id, status, internalNote } = parsed.data
@@ -35,7 +35,7 @@ export async function PATCH(request: Request) {
       ...(status ? { status } : {}),
       ...(internalNote !== undefined ? { payload: { ...lead.payload, internalNote } } : {}),
     }
-    const { error } = await supabase.from('leads').update(patch).eq('id', id)
+    const { error } = await db.from('leads').update(patch).eq('id', id)
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json({ ok: true })
   } catch (error) {

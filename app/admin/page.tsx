@@ -3,7 +3,7 @@ import { ArrowRight, BadgeDollarSign, Boxes, ClipboardList, Smartphone, Triangle
 import { AdminShell } from './admin-shell'
 import { SalesTrend } from './sales-trend'
 import { BackupLink, BackupStatus } from './backup-status'
-import { requireAdmin } from '../../src/lib/supabase/auth'
+import { requireAdminPage } from '../../src/lib/auth/session'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,15 +12,15 @@ function money(value: number) {
 }
 
 export default async function AdminDashboard() {
-  const { supabase, profile } = await requireAdmin()
+  const { db, profile } = await requireAdminPage()
   const [models, variants, units, leads, sales, lowStock, latestLeads] = await Promise.all([
-    supabase.from('phone_models').select('id', { count: 'exact', head: true }),
-    supabase.from('variants').select('id', { count: 'exact', head: true }),
-    supabase.from('used_units').select('id', { count: 'exact', head: true }),
-    supabase.from('leads').select('id', { count: 'exact', head: true }).eq('status', 'new'),
-    supabase.from('sales').select('sale_price,sold_at,kind,undone_at').is('undone_at', null).gte('sold_at', new Date(Date.now() - 7 * 86400000).toISOString()).order('sold_at', { ascending: true }),
-    supabase.from('variants').select('id,stock_count,low_stock_threshold,model_id,phone_models(name,brands(name))').lte('stock_count', 2).limit(8),
-    supabase.from('leads').select('id,type,name,contact,status,created_at').order('created_at', { ascending: false }).limit(5),
+    db.from('phone_models').select('id', { count: 'exact', head: true }),
+    db.from('variants').select('id', { count: 'exact', head: true }),
+    db.from('used_units').select('id', { count: 'exact', head: true }),
+    db.from('leads').select('id', { count: 'exact', head: true }).eq('status', 'new'),
+    db.from('sales').select('sale_price,sold_at,kind,undone_at').is('undone_at', null).gte('sold_at', new Date(Date.now() - 7 * 86400000).toISOString()).order('sold_at', { ascending: true }),
+    db.from('variants').select('id,stock_count,low_stock_threshold,model_id,phone_models(name,brands(name))').lte('stock_count', 2).limit(8),
+    db.from('leads').select('id,type,name,contact,status,created_at').order('created_at', { ascending: false }).limit(5),
   ])
   const error = models.error ?? variants.error ?? units.error ?? leads.error ?? sales.error ?? lowStock.error ?? latestLeads.error
   if (error) throw new Error(`Could not load the admin dashboard: ${error.message}`)

@@ -1,4 +1,4 @@
-import library from '../../../supabase/spec-library.json'
+import library from '../../data/spec-library.json'
 import { validateSpecs } from './normalize'
 import type { NormalizedSpecs, SpecProvider } from './types'
 

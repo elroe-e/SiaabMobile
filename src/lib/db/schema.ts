@@ -1,4 +1,11 @@
-create extension if not exists pgcrypto;
+// The whole database design, applied once by migrate.ts. Written for PostgreSQL 10 (the cPanel server version).
+// Kept as a string so the deploy bundle carries it; edit the SQL here and add a new MIGRATIONS entry for changes.
+export const schemaSql = String.raw`-- PostgreSQL 10 compatible: no extensions, ids come from new_uuid().
+create function public.new_uuid() returns uuid language sql volatile as $$
+  -- Random hex shaped as a standard version-4 UUID (version digit 4, variant 8/9/a/b), which input checks expect.
+  select (substr(h, 1, 12) || '4' || substr(h, 14, 3) || substr('89ab', (strpos('0123456789abcdef', substr(h, 17, 1)) - 1) % 4 + 1, 1) || substr(h, 18, 15))::uuid
+  from (select md5(random()::text || clock_timestamp()::text || txid_current()::text) as h) as random_hex
+$$;
 
 create type public.profile_role as enum ('owner', 'staff');
 create type public.model_status as enum ('available', 'upcoming', 'discontinued');
@@ -9,14 +16,19 @@ create type public.lead_status as enum ('new', 'contacted', 'closed');
 create type public.sale_kind as enum ('new', 'used');
 
 create table public.profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
+  id uuid primary key default public.new_uuid(),
+  email text not null unique check (email = lower(email)),
+  password_hash text not null,
+  totp_secret text,
+  totp_pending text,
+  disabled_at timestamptz,
   full_name text not null default '',
   role public.profile_role not null default 'staff',
   created_at timestamptz not null default now()
 );
 
 create table public.brands (
-  id uuid primary key default gen_random_uuid(),
+  id uuid primary key default public.new_uuid(),
   name text not null unique,
   slug text not null unique,
   logo_path text,
@@ -24,7 +36,7 @@ create table public.brands (
 );
 
 create table public.phone_models (
-  id uuid primary key default gen_random_uuid(),
+  id uuid primary key default public.new_uuid(),
   brand_id uuid not null references public.brands(id),
   name text not null,
   slug text not null unique,
@@ -44,7 +56,7 @@ create table public.phone_models (
 );
 
 create table public.variants (
-  id uuid primary key default gen_random_uuid(),
+  id uuid primary key default public.new_uuid(),
   model_id uuid not null references public.phone_models(id) on delete cascade,
   ram_gb integer not null check (ram_gb between 1 and 24),
   storage_gb integer not null check (storage_gb between 1 and 2048),
@@ -60,7 +72,7 @@ create table public.variants (
 );
 
 create table public.used_units (
-  id uuid primary key default gen_random_uuid(),
+  id uuid primary key default public.new_uuid(),
   model_id uuid not null references public.phone_models(id),
   ram_gb integer not null check (ram_gb between 1 and 24),
   storage_gb integer not null check (storage_gb between 1 and 2048),
@@ -83,7 +95,7 @@ create table public.used_units (
 );
 
 create table public.used_unit_photos (
-  id uuid primary key default gen_random_uuid(),
+  id uuid primary key default public.new_uuid(),
   unit_id uuid not null references public.used_units(id) on delete cascade,
   path text not null,
   sort_order integer not null default 0,
@@ -92,7 +104,7 @@ create table public.used_unit_photos (
 );
 
 create table public.model_photos (
-  id uuid primary key default gen_random_uuid(),
+  id uuid primary key default public.new_uuid(),
   model_id uuid not null references public.phone_models(id) on delete cascade,
   path text not null,
   sort_order integer not null default 0,
@@ -101,7 +113,7 @@ create table public.model_photos (
 );
 
 create table public.sales (
-  id uuid primary key default gen_random_uuid(),
+  id uuid primary key default public.new_uuid(),
   kind public.sale_kind not null,
   variant_id uuid references public.variants(id),
   unit_id uuid references public.used_units(id),
@@ -115,7 +127,7 @@ create table public.sales (
 );
 
 create table public.trade_in_values (
-  id uuid primary key default gen_random_uuid(),
+  id uuid primary key default public.new_uuid(),
   model_id uuid references public.phone_models(id) on delete set null,
   brand_text text not null,
   model_text text not null,
@@ -132,7 +144,7 @@ create table public.trade_in_config (
 );
 
 create table public.leads (
-  id uuid primary key default gen_random_uuid(),
+  id uuid primary key default public.new_uuid(),
   type public.lead_type not null,
   name text not null check (length(name) between 1 and 120),
   contact text not null check (length(contact) between 3 and 240),
@@ -142,7 +154,7 @@ create table public.leads (
 );
 
 create table public.audit_log (
-  id uuid primary key default gen_random_uuid(),
+  id uuid primary key default public.new_uuid(),
   user_id uuid references public.profiles(id),
   action text not null,
   table_name text not null,
@@ -175,14 +187,20 @@ create index leads_created_at_idx on public.leads(created_at desc);
 create index leads_contact_created_idx on public.leads(contact, created_at desc);
 create index audit_log_created_idx on public.audit_log(created_at desc);
 
+-- The app sets app.user_id inside each signed-in transaction; the public site sets nothing.
+create function public.current_actor() returns uuid
+language sql stable as $$
+  select nullif(current_setting('app.user_id', true), '')::uuid
+$$;
+
 create function public.is_staff_or_owner() returns boolean
 language sql stable security definer set search_path = '' as $$
-  select exists (select 1 from public.profiles p where p.id = (select auth.uid()));
+  select exists (select 1 from public.profiles p where p.id = public.current_actor() and p.disabled_at is null);
 $$;
 
 create function public.is_owner() returns boolean
 language sql stable security definer set search_path = '' as $$
-  select exists (select 1 from public.profiles p where p.id = (select auth.uid()) and p.role = 'owner');
+  select exists (select 1 from public.profiles p where p.id = public.current_actor() and p.role = 'owner' and p.disabled_at is null);
 $$;
 
 create function public.protect_used_unit_private_fields() returns trigger
@@ -205,7 +223,7 @@ $$;
 
 create trigger used_units_private_fields
 before insert or update on public.used_units
-for each row execute function public.protect_used_unit_private_fields();
+for each row execute procedure public.protect_used_unit_private_fields();
 
 create function public.touch_updated_at() returns trigger
 language plpgsql set search_path = '' as $$
@@ -215,9 +233,9 @@ begin
 end;
 $$;
 
-create trigger phone_models_touch before update on public.phone_models for each row execute function public.touch_updated_at();
-create trigger shop_settings_touch before update on public.shop_settings for each row execute function public.touch_updated_at();
-create trigger trade_in_config_touch before update on public.trade_in_config for each row execute function public.touch_updated_at();
+create trigger phone_models_touch before update on public.phone_models for each row execute procedure public.touch_updated_at();
+create trigger shop_settings_touch before update on public.shop_settings for each row execute procedure public.touch_updated_at();
+create trigger trade_in_config_touch before update on public.trade_in_config for each row execute procedure public.touch_updated_at();
 
 create function public.enforce_reviewed_specs() returns trigger
 language plpgsql set search_path = '' as $$
@@ -228,7 +246,7 @@ begin
   return new;
 end;
 $$;
-create trigger phone_models_review_gate before insert or update of status, specs_reviewed on public.phone_models for each row execute function public.enforce_reviewed_specs();
+create trigger phone_models_review_gate before insert or update of status, specs_reviewed on public.phone_models for each row execute procedure public.enforce_reviewed_specs();
 
 create function public.log_inventory_change() returns trigger
 language plpgsql security definer set search_path = '' as $$
@@ -240,71 +258,21 @@ begin
   if tg_op <> 'INSERT' then before_data = to_jsonb(old); row_id = before_data ->> 'id'; end if;
   if tg_op <> 'DELETE' then after_data = to_jsonb(new); row_id = after_data ->> 'id'; end if;
   insert into public.audit_log(user_id, action, table_name, record_id, before, after)
-  values ((select auth.uid()), tg_op, tg_table_name, row_id, before_data, after_data);
+  values (public.current_actor(), tg_op, tg_table_name, row_id, before_data, after_data);
   if tg_op = 'DELETE' then return old; end if;
   return new;
 end;
 $$;
 
-create trigger audit_phone_models after insert or update or delete on public.phone_models for each row execute function public.log_inventory_change();
-create trigger audit_variants after insert or update or delete on public.variants for each row execute function public.log_inventory_change();
-create trigger audit_used_units after insert or update or delete on public.used_units for each row execute function public.log_inventory_change();
-create trigger audit_trade_values after insert or update or delete on public.trade_in_values for each row execute function public.log_inventory_change();
-create trigger audit_settings after insert or update or delete on public.shop_settings for each row execute function public.log_inventory_change();
-create trigger audit_trade_config after insert or update or delete on public.trade_in_config for each row execute function public.log_inventory_change();
+create trigger audit_phone_models after insert or update or delete on public.phone_models for each row execute procedure public.log_inventory_change();
+create trigger audit_variants after insert or update or delete on public.variants for each row execute procedure public.log_inventory_change();
+create trigger audit_used_units after insert or update or delete on public.used_units for each row execute procedure public.log_inventory_change();
+create trigger audit_trade_values after insert or update or delete on public.trade_in_values for each row execute procedure public.log_inventory_change();
+create trigger audit_settings after insert or update or delete on public.shop_settings for each row execute procedure public.log_inventory_change();
+create trigger audit_trade_config after insert or update or delete on public.trade_in_config for each row execute procedure public.log_inventory_change();
 
-alter table public.profiles enable row level security;
-alter table public.brands enable row level security;
-alter table public.phone_models enable row level security;
-alter table public.variants enable row level security;
-alter table public.used_units enable row level security;
-alter table public.used_unit_photos enable row level security;
-alter table public.model_photos enable row level security;
-alter table public.sales enable row level security;
-alter table public.trade_in_values enable row level security;
-alter table public.trade_in_config enable row level security;
-alter table public.leads enable row level security;
-alter table public.audit_log enable row level security;
-alter table public.shop_settings enable row level security;
 
-create policy profile_self_read on public.profiles for select to authenticated using (id = (select auth.uid()) or public.is_owner());
-create policy profile_owner_manage on public.profiles for all to authenticated using (public.is_owner()) with check (public.is_owner());
-create policy brands_staff_read on public.brands for select to authenticated using (public.is_staff_or_owner());
-create policy brands_staff_insert on public.brands for insert to authenticated with check (public.is_staff_or_owner());
-create policy brands_owner_manage on public.brands for update to authenticated using (public.is_owner()) with check (public.is_owner());
-create policy brands_owner_delete on public.brands for delete to authenticated using (public.is_owner());
 
-create policy models_staff_read on public.phone_models for select to authenticated using (public.is_staff_or_owner());
-create policy models_staff_insert on public.phone_models for insert to authenticated with check (public.is_staff_or_owner());
-create policy models_staff_update on public.phone_models for update to authenticated using (public.is_staff_or_owner()) with check (public.is_staff_or_owner());
-create policy models_owner_delete on public.phone_models for delete to authenticated using (public.is_owner());
-create policy variants_staff_read on public.variants for select to authenticated using (public.is_staff_or_owner());
-create policy variants_staff_insert on public.variants for insert to authenticated with check (public.is_staff_or_owner());
-create policy variants_staff_update on public.variants for update to authenticated using (public.is_staff_or_owner()) with check (public.is_staff_or_owner());
-create policy variants_owner_delete on public.variants for delete to authenticated using (public.is_owner());
-create policy used_staff_read on public.used_units for select to authenticated using (public.is_staff_or_owner());
-create policy used_staff_insert on public.used_units for insert to authenticated with check (public.is_staff_or_owner());
-create policy used_staff_update on public.used_units for update to authenticated using (public.is_staff_or_owner()) with check (public.is_staff_or_owner());
-create policy used_owner_delete on public.used_units for delete to authenticated using (public.is_owner());
-create policy model_photos_staff_manage on public.model_photos for all to authenticated using (public.is_staff_or_owner()) with check (public.is_staff_or_owner());
-create policy unit_photos_staff_manage on public.used_unit_photos for all to authenticated using (public.is_staff_or_owner()) with check (public.is_staff_or_owner());
-create policy sales_staff_read on public.sales for select to authenticated using (public.is_staff_or_owner());
-create policy trade_values_staff_read on public.trade_in_values for select to authenticated using (public.is_staff_or_owner());
-create policy trade_values_owner_manage on public.trade_in_values for all to authenticated using (public.is_owner()) with check (public.is_owner());
-create policy trade_config_staff_read on public.trade_in_config for select to authenticated using (public.is_staff_or_owner());
-create policy trade_config_owner_manage on public.trade_in_config for all to authenticated using (public.is_owner()) with check (public.is_owner());
-create policy leads_staff_manage on public.leads for all to authenticated using (public.is_staff_or_owner()) with check (public.is_staff_or_owner());
-create policy audit_owner_read on public.audit_log for select to authenticated using (public.is_owner());
-create policy settings_staff_read on public.shop_settings for select to authenticated using (public.is_staff_or_owner());
-create policy settings_owner_manage on public.shop_settings for all to authenticated using (public.is_owner()) with check (public.is_owner());
-
-grant usage on schema public to anon, authenticated;
-grant usage on type public.profile_role, public.model_status, public.unit_grade, public.unit_status,
-  public.lead_type, public.lead_status, public.sale_kind to anon, authenticated;
-grant select, insert, update, delete on public.profiles, public.brands, public.phone_models, public.variants,
-  public.model_photos, public.used_unit_photos, public.sales, public.trade_in_values, public.trade_in_config,
-  public.leads, public.audit_log, public.shop_settings to authenticated;
-grant insert, update, delete on public.used_units to authenticated;
 
 create view public.public_models with (security_barrier = true) as
 select m.id, b.name as brand, b.slug as brand_slug, m.name, m.slug, m.status, m.expected_date, m.expected_price_range, m.tagline,
@@ -363,10 +331,6 @@ select u.id, u.model_id, u.ram_gb, u.storage_gb, u.color_name, u.grade,
        u.status, u.is_published, u.reserved_until, u.sold_at, u.created_by, u.created_at
 from public.used_units u;
 
-revoke select on public.used_units from anon, authenticated;
-grant select (id, model_id, ram_gb, storage_gb, color_name, grade, battery_health_pct, accessories, warranty_months, price, status, is_published, reserved_until, sold_at, created_by, created_at) on public.used_units to authenticated;
-grant select on public.admin_used_units to authenticated;
-grant select on public.public_models, public.public_variants, public.public_used_units, public.public_model_photos, public.public_shop_settings, public.public_trade_in_values, public.public_trade_in_config to anon, authenticated;
 
 create function public.submit_public_lead(p_type public.lead_type, p_name text, p_contact text, p_payload jsonb default '{}'::jsonb)
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -381,7 +345,7 @@ begin
   if p_contact is null or length(trim(p_contact)) not between 3 and 240 then raise exception 'Contact is required'; end if;
   if p_payload is null or pg_column_size(p_payload) > 16384 then raise exception 'Request is too large'; end if;
   normalized_contact = lower(trim(p_contact));
-  perform pg_advisory_xact_lock(hashtextextended(normalized_contact, 0));
+  perform pg_advisory_xact_lock(hashtext(normalized_contact));
   if (select count(*) from public.leads l where lower(l.contact) = normalized_contact and l.created_at > now() - interval '10 minutes') >= 5 then
     raise exception 'Too many requests. Please try again later.';
   end if;
@@ -390,8 +354,6 @@ begin
   return new_id;
 end;
 $$;
-revoke all on function public.submit_public_lead(public.lead_type, text, text, jsonb) from public, authenticated;
-grant execute on function public.submit_public_lead(public.lead_type, text, text, jsonb) to anon, authenticated;
 
 create function public.sell_variant(p_variant_id uuid, p_quantity integer, p_sale_price numeric, p_buyer_note text default null)
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -406,7 +368,7 @@ begin
   if item.stock_count < p_quantity then raise exception 'Not enough stock'; end if;
   update public.variants set stock_count = stock_count - p_quantity where id = item.id;
   insert into public.sales(kind, variant_id, quantity, sale_price, sold_by, buyer_note)
-  values ('new', item.id, p_quantity, p_sale_price, (select auth.uid()), p_buyer_note)
+  values ('new', item.id, p_quantity, p_sale_price, public.current_actor(), p_buyer_note)
   returning id into sale_id;
   return sale_id;
 end;
@@ -426,7 +388,7 @@ begin
   if item.status = 'hidden' then raise exception 'Hidden units cannot be sold'; end if;
   update public.used_units set status = 'sold', sold_at = now() where id = item.id;
   insert into public.sales(kind, unit_id, quantity, sale_price, sold_by, buyer_note)
-  values ('used', item.id, 1, p_sale_price, (select auth.uid()), p_buyer_note)
+  values ('used', item.id, 1, p_sale_price, public.current_actor(), p_buyer_note)
   returning id into sale_id;
   return sale_id;
 end;
@@ -468,14 +430,6 @@ begin
 end;
 $$;
 
-revoke all on function public.sell_variant(uuid, integer, numeric, text) from public, anon;
-revoke all on function public.sell_used_unit(uuid, numeric, text) from public, anon;
-revoke all on function public.undo_sale(uuid) from public, anon;
-revoke all on function public.reserve_used_unit(uuid, integer) from public, anon;
-grant execute on function public.sell_variant(uuid, integer, numeric, text) to authenticated;
-grant execute on function public.sell_used_unit(uuid, numeric, text) to authenticated;
-grant execute on function public.undo_sale(uuid) to authenticated;
-grant execute on function public.reserve_used_unit(uuid, integer) to authenticated;
 
 create function public.create_inventory(p_model jsonb, p_kind text, p_variant jsonb default null, p_unit jsonb default null)
 returns jsonb language plpgsql security definer set search_path = '' as $$
@@ -506,7 +460,7 @@ begin
     case when p_kind = 'upcoming' then 'upcoming'::public.model_status else (p_model ->> 'status')::public.model_status end,
     nullif(p_model ->> 'expectedDate', ''), nullif(p_model ->> 'expectedPriceRange', ''), coalesce(p_model ->> 'tagline', ''),
     coalesce(p_model -> 'specs', '{}'::jsonb), coalesce(p_model -> 'specMeta', '{}'::jsonb),
-    coalesce((p_model ->> 'specsReviewed')::boolean, false), (select auth.uid())
+    coalesce((p_model ->> 'specsReviewed')::boolean, false), public.current_actor()
   )
   returning id into new_model_id;
 
@@ -529,23 +483,12 @@ begin
       coalesce(p_unit ->> 'accessories', 'Phone only'), coalesce((p_unit ->> 'warrantyMonths')::integer, 0),
       (p_unit ->> 'price')::numeric, nullif(p_unit ->> 'costPrice', '')::numeric,
       nullif(p_unit ->> 'imei', ''), coalesce(p_unit ->> 'notesInternal', ''),
-      coalesce((p_model ->> 'published')::boolean, false), (select auth.uid())
+      coalesce((p_model ->> 'published')::boolean, false), public.current_actor()
     ) returning id into new_unit_id;
   end if;
   return jsonb_build_object('modelId', new_model_id, 'unitId', new_unit_id);
 end;
 $$;
-revoke all on function public.create_inventory(jsonb, text, jsonb, jsonb) from public, anon;
-grant execute on function public.create_inventory(jsonb, text, jsonb, jsonb) to authenticated;
-
-create function public.storage_usage_bytes()
-returns bigint language sql stable security definer set search_path = '' as $$
-  select coalesce(sum((o.metadata ->> 'size')::bigint), 0)
-  from storage.objects o
-  where o.bucket_id = 'phone-photos' and public.is_owner();
-$$;
-revoke all on function public.storage_usage_bytes() from public, anon;
-grant execute on function public.storage_usage_bytes() to authenticated;
 
 insert into public.shop_settings(id) values (1) on conflict (id) do nothing;
 insert into public.trade_in_config(id, config) values (1, '{
@@ -558,11 +501,18 @@ insert into public.trade_in_config(id, config) values (1, '{
   "range":{"min":0.92,"max":1.05}
 }'::jsonb) on conflict (id) do nothing;
 
-insert into storage.buckets(id, name, public, file_size_limit, allowed_mime_types)
-values ('phone-photos', 'phone-photos', true, 2097152, array['image/webp', 'image/jpeg', 'image/png'])
-on conflict (id) do update set public = excluded.public, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+create table public.sessions (
+  id text primary key,
+  profile_id uuid not null references public.profiles(id) on delete cascade,
+  mfa_passed boolean not null default false,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null
+);
+create index sessions_profile_idx on public.sessions(profile_id);
 
-create policy phone_photos_public_read on storage.objects for select to anon, authenticated using (bucket_id = 'phone-photos');
-create policy phone_photos_staff_insert on storage.objects for insert to authenticated with check (bucket_id = 'phone-photos' and public.is_staff_or_owner());
-create policy phone_photos_staff_update on storage.objects for update to authenticated using (bucket_id = 'phone-photos' and public.is_staff_or_owner()) with check (bucket_id = 'phone-photos' and public.is_staff_or_owner());
-create policy phone_photos_staff_delete on storage.objects for delete to authenticated using (bucket_id = 'phone-photos' and public.is_staff_or_owner());
+create table public.login_attempts (
+  key text not null,
+  attempted_at timestamptz not null default now()
+);
+create index login_attempts_key_idx on public.login_attempts(key, attempted_at desc);
+`

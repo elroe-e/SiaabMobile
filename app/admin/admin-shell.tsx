@@ -6,7 +6,6 @@ import { usePathname, useRouter } from 'next/navigation'
 import { ArrowUpRight, BadgeDollarSign, Boxes, ClipboardList, LayoutDashboard, LogOut, Settings2, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { getBrowserSupabase } from '../../src/lib/supabase/browser'
 
 type ProfileRole = 'owner' | 'staff'
 
@@ -26,10 +25,10 @@ export function AdminShell({ children, name, role }: { children: ReactNode; name
   const visibleLinks = links.filter((link) => !link.ownerOnly || role === 'owner')
   const signOut = async () => {
     setSigningOut(true)
-    const { error } = await getBrowserSupabase().auth.signOut()
-    if (error) {
+    const response = await fetch('/api/auth/logout', { method: 'POST' }).catch(() => null)
+    if (!response?.ok) {
       setSigningOut(false)
-      window.alert(`Could not sign out: ${error.message}`)
+      window.alert('Could not sign out. Check your connection and try again.')
       return
     }
     router.replace('/admin/login')

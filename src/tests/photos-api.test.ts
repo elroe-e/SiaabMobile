@@ -3,9 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const state = { selected: [] as string[], removed: [] as string[][], deleted: [] as string[] }
 
-vi.mock('../lib/supabase/auth', () => ({
+vi.mock('../lib/auth/session', () => ({
   requireAdmin: async () => ({
-    supabase: {
+    db: {
       from: (table: string) => ({
         select: (columns: string) => {
           state.selected.push(`${table}:${columns}`)

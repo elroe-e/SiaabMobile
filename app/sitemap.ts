@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next'
 import { phones } from '../src/data/phones'
 import { shop } from '../src/data/shop'
-import { getPublicCatalog } from '../src/lib/supabase/public-catalog'
+import { getPublicCatalog } from '../src/lib/db/public-catalog'
 
 export const dynamic = 'force-dynamic'
 

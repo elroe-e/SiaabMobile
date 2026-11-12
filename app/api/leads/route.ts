@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
-import { getSupabasePublicConfig, isSupabaseConfigured } from '../../../src/lib/supabase/config'
+import { createDbClient } from '../../../src/lib/db/client'
+import { isDatabaseConfigured } from '../../../src/lib/db/pool'
 
 const leadSchema = z.object({
   type: z.enum(['trade_in', 'notify_me', 'contact', 'reservation']),
@@ -13,10 +13,8 @@ const leadSchema = z.object({
 export async function POST(request: Request) {
   const parsed = leadSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Enter a name and valid contact details.' }, { status: 400 })
-  if (!isSupabaseConfigured) return NextResponse.json({ error: 'Lead storage is not configured. Your WhatsApp message can still be sent.' }, { status: 503 })
-  const { url, key } = getSupabasePublicConfig()
-  const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
-  const { data, error } = await supabase.rpc('submit_public_lead', {
+  if (!isDatabaseConfigured) return NextResponse.json({ error: 'Lead storage is not configured. Your WhatsApp message can still be sent.' }, { status: 503 })
+  const { data, error } = await createDbClient().rpc('submit_public_lead', {
     p_type: parsed.data.type,
     p_name: parsed.data.name,
     p_contact: parsed.data.contact,

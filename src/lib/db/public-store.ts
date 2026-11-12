@@ -1,5 +1,6 @@
 import 'server-only'
-import { createClient } from '@supabase/supabase-js'
+import { createDbClient } from './client'
+import { photoUrl } from './photos'
 import { shop as sampleShop } from '../../data/shop'
 import { tradeInValues as sampleTradeValues } from '../../data/tradeInValues'
 import { upcomingPhones as sampleUpcoming } from '../../data/upcoming'
@@ -8,7 +9,7 @@ import { tradeInConfig as sampleTradeConfig } from '../tradeIn'
 import type { StoreData } from '../../context/StoreDataContext'
 import type { TradeInConfig } from '../tradeIn'
 import type { UpcomingPhone } from '../../types'
-import { getSupabasePublicConfig, isSupabaseConfigured } from './config'
+import { isDatabaseConfigured } from './pool'
 
 type DbModel = { id: string; brand: string; name: string; slug: string; expected_date: string | null; expected_price_range: string | null; tagline: string; specs: Record<string, unknown> }
 type DbPhoto = { model_id: string; path: string; sort_order: number; is_main: boolean }
@@ -27,21 +28,20 @@ function stringifySpec(value: unknown): string {
 }
 
 export async function getPublicStoreData(): Promise<StoreData> {
-  if (!isSupabaseConfigured) return {
+  if (!isDatabaseConfigured) return {
     shop: sampleShop,
     tradeInValues: sampleTradeValues,
     tradeInConfig: sampleTradeConfig,
     upcomingPhones: sampleUpcoming,
   }
 
-  const { url, key } = getSupabasePublicConfig()
-  const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+  const db = createDbClient()
   const [modelsResult, photosResult, valuesResult, configResult, settingsResult] = await Promise.all([
-    supabase.from('public_models').select('id,brand,name,slug,expected_date,expected_price_range,tagline,specs').eq('status', 'upcoming'),
-    supabase.from('public_model_photos').select('model_id,path,sort_order,is_main').order('sort_order'),
-    supabase.from('public_trade_in_values').select('brand_text,model_text,storage_gb,base_value'),
-    supabase.from('public_trade_in_config').select('config').maybeSingle(),
-    supabase.from('public_shop_settings').select('*').maybeSingle(),
+    db.from('public_models').select('id,brand,name,slug,expected_date,expected_price_range,tagline,specs').eq('status', 'upcoming'),
+    db.from('public_model_photos').select('model_id,path,sort_order,is_main').order('sort_order'),
+    db.from('public_trade_in_values').select('brand_text,model_text,storage_gb,base_value'),
+    db.from('public_trade_in_config').select('config').maybeSingle(),
+    db.from('public_shop_settings').select('*').maybeSingle(),
   ])
   const errors = [modelsResult.error, photosResult.error, valuesResult.error, configResult.error, settingsResult.error].filter(Boolean)
   if (errors.length) throw new Error(`Could not load public store settings: ${errors.map((error) => error?.message).join('; ')}`)
@@ -66,7 +66,7 @@ export async function getPublicStoreData(): Promise<StoreData> {
       teaser: model.tagline || sample?.teaser || 'More details coming soon.',
       expectedPriceRange: model.expected_price_range || sample?.expectedPriceRange || 'To be announced',
       keyRumoredSpecs: specs.length ? specs : sample?.keyRumoredSpecs ?? ['Details to be announced'],
-      image: photo ? `${url}/storage/v1/object/public/phone-photos/${photo.path}` : sample?.image ?? placeholderImages(model.slug)[0] ?? '/og-image.svg',
+      image: photo ? photoUrl(photo.path) : sample?.image ?? placeholderImages(model.slug)[0] ?? '/og-image.svg',
       notifyEnabled: true,
     }
   })
