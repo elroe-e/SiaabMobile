@@ -34,7 +34,11 @@ export function setDatabaseForTests(database: Database | undefined) { state.over
 function pgDatabase(): Database {
   if (!process.env.DATABASE_URL) throw new Error('Set DATABASE_URL to connect the shop database.')
   // Shared hosting limits connections, so a handful is plenty for one shop.
-  state.pool ??= new Pool({ connectionString: process.env.DATABASE_URL, max: 5, idleTimeoutMillis: 30_000 })
+  if (!state.pool) {
+    state.pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5, idleTimeoutMillis: 30_000 })
+    // Without a listener, a dropped idle connection (database restart) would crash the whole site.
+    state.pool.on('error', (error) => console.error('Idle database connection failed', error))
+  }
   const pool = state.pool
   return {
     async run(work, actor) {
