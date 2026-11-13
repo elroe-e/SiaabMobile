@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { BadgeDollarSign, RotateCcw } from 'lucide-react'
+import { RotateCcw } from 'lucide-react'
 import { SalesTrend } from '../sales-trend'
 
 type Role = 'owner' | 'staff'
@@ -87,9 +87,9 @@ export function SalesManager({ role }: { role: Role }) {
   const monthTotal = sales.filter((sale) => !sale.undone_at && Date.now() - Date.parse(sale.sold_at) <= 30 * 86400000).reduce((sum, sale) => sum + Number(sale.sale_price), 0)
 
   return <section>
-    <div className="admin-page-heading"><div><h2>Sales</h2><p>Record phone sales and track stock movements.</p></div><span className="admin-badge green"><BadgeDollarSign size={11} /> Transactional stock control</span></div>
+    <div className="admin-page-heading"><div><h2>Sales</h2><p>Record phone sales and track stock movements</p></div></div>
     {error && <div className="admin-error" role="alert">{error}</div>}{notice && <div className="admin-success" role="status">{notice}</div>}
-    <div className="admin-stat-grid"><article className="admin-stat"><div className="admin-stat-head"><span>Last 7 days</span><BadgeDollarSign size={15} /></div><strong className="admin-stat-value">{money(weekTotal)}</strong><span className="admin-stat-note">Gross recorded sales</span></article><article className="admin-stat"><div className="admin-stat-head"><span>Last 30 days</span><BadgeDollarSign size={15} /></div><strong className="admin-stat-value">{money(monthTotal)}</strong><span className="admin-stat-note">Gross recorded sales</span></article><article className="admin-stat"><div className="admin-stat-head"><span>Transactions</span><BadgeDollarSign size={15} /></div><strong className="admin-stat-value">{sales.filter((sale) => !sale.undone_at).length}</strong><span className="admin-stat-note">Active sale records</span></article>{role === 'owner' && <article className="admin-stat"><div className="admin-stat-head"><span>Private margin</span><BadgeDollarSign size={15} /></div><strong className="admin-stat-value">{money(sales.filter((sale) => !sale.undone_at && sale.cost_price != null).reduce((sum, sale) => sum + Number(sale.sale_price) - Number(sale.cost_price), 0))}</strong><span className="admin-stat-note">Only for units with saved cost</span></article>}</div>
+    <div className="admin-stat-grid"><article className="admin-stat"><div className="admin-stat-head">Last 7 days</div><strong className="admin-stat-value">{money(weekTotal)}</strong><span className="admin-stat-note">Gross recorded sales</span></article><article className="admin-stat"><div className="admin-stat-head">Last 30 days</div><strong className="admin-stat-value">{money(monthTotal)}</strong><span className="admin-stat-note">Gross recorded sales</span></article><article className="admin-stat"><div className="admin-stat-head">Transactions</div><strong className="admin-stat-value">{sales.filter((sale) => !sale.undone_at).length}</strong><span className="admin-stat-note">Active sale records</span></article>{role === 'owner' && <article className="admin-stat"><div className="admin-stat-head">Private margin</div><strong className="admin-stat-value">{money(sales.filter((sale) => !sale.undone_at && sale.cost_price != null).reduce((sum, sale) => sum + Number(sale.sale_price) - Number(sale.cost_price), 0))}</strong><span className="admin-stat-note">Only for units with saved cost</span></article>}</div>
     <div className="admin-dashboard-grid">
       <article className="admin-card"><div className="admin-card-title"><h3>Sales trend</h3><span>Gross sales by day</span></div><SalesTrend data={trend} /></article>
       <form className="admin-card" onSubmit={submitSale}><div className="admin-card-title"><h3>Record a sale</h3><span>Stock changes immediately</span></div>
@@ -97,12 +97,12 @@ export function SalesManager({ role }: { role: Role }) {
         <button className="button button-primary button-small" type="submit" disabled={saving || !chosen}>{saving ? 'Recording…' : 'Record sale'}</button>
       </form>
     </div>
-    <article className="admin-card" style={{ marginTop: 14 }}>
+    <article className="admin-card" style={{ marginTop: 16 }}>
       <div className="admin-toolbar"><div className="admin-card-title" style={{ marginBottom: 0 }}><h3>Sale history</h3><span>{filteredSales.length} records · up to 500 most recent</span></div><div className="admin-tabs">{(['all', 'new', 'used'] as const).map((value) => <button key={value} className={filter === value ? 'active' : ''} onClick={() => setFilter(value)}>{value === 'all' ? 'All' : value === 'new' ? 'New phones' : 'Used phones'}</button>)}</div></div>
       {loading ? <div className="admin-empty">Loading sales…</div> : !filteredSales.length ? <div className="admin-empty">No sales recorded yet.</div> : <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Phone</th><th>Type</th><th>Quantity</th><th>Sale price</th>{role === 'owner' && <th>Cost / margin</th>}<th>Sold at</th><th>Status</th><th>Action</th></tr></thead><tbody>{filteredSales.map((sale) => {
         const model = sale.kind === 'new' ? sale.variants?.phone_models ?? null : sale.used_units?.phone_models ?? null
         const canUndo = role === 'owner' || Date.now() - Date.parse(sale.sold_at) < 24 * 60 * 60 * 1000
-        return <tr key={sale.id}><td><strong>{modelName(model)}</strong>{sale.buyer_note && <small>{sale.buyer_note}</small>}</td><td><span className={`admin-badge ${sale.kind === 'new' ? 'green' : 'amber'}`}>{sale.kind}</span></td><td>{sale.quantity}</td><td>{money(sale.sale_price)}</td>{role === 'owner' && <td>{sale.cost_price == null ? '—' : <><strong>{money(sale.cost_price)}</strong><small>Margin {money(Number(sale.sale_price) - Number(sale.cost_price))}</small></>}</td>}<td>{new Date(sale.sold_at).toLocaleString()}</td><td><span className={`admin-badge ${sale.undone_at ? 'gray' : 'green'}`}>{sale.undone_at ? 'Undone' : 'Complete'}</span></td><td>{!sale.undone_at && canUndo && <button className="admin-icon-button" title="Undo sale" onClick={() => void undo(sale)}><RotateCcw size={14} /></button>}</td></tr>
+        return <tr key={sale.id}><td><strong>{modelName(model)}</strong>{sale.buyer_note && <small>{sale.buyer_note}</small>}</td><td><span className={`admin-badge ${sale.kind === 'new' ? 'green' : 'amber'}`}>{sale.kind}</span></td><td>{sale.quantity}</td><td>{money(sale.sale_price)}</td>{role === 'owner' && <td>{sale.cost_price == null ? '—' : <><strong>{money(sale.cost_price)}</strong><small>Margin {money(Number(sale.sale_price) - Number(sale.cost_price))}</small></>}</td>}<td>{new Date(sale.sold_at).toLocaleString()}</td><td><span className={`admin-badge ${sale.undone_at ? 'gray' : 'green'}`}>{sale.undone_at ? 'Undone' : 'Complete'}</span></td><td>{!sale.undone_at && canUndo && <button className="admin-icon-button" title="Undo sale" onClick={() => void undo(sale)}><RotateCcw size={16} /></button>}</td></tr>
       })}</tbody></table></div>}
     </article>
   </section>

@@ -13,9 +13,9 @@ const links = [
   { href: '/admin', label: 'Overview', icon: LayoutDashboard },
   { href: '/admin/inventory', label: 'Inventory', icon: Boxes },
   { href: '/admin/sales', label: 'Sales', icon: BadgeDollarSign },
-  { href: '/admin/leads', label: 'Leads & requests', icon: ClipboardList },
+  { href: '/admin/leads', label: 'Requests', icon: ClipboardList },
   { href: '/admin/settings', label: 'Settings', icon: Settings2, ownerOnly: true },
-  { href: '/admin/activity', label: 'Activity log', icon: ShieldCheck, ownerOnly: true },
+  { href: '/admin/activity', label: 'Activity', icon: ShieldCheck, ownerOnly: true },
 ]
 
 export function AdminShell({ children, name, role }: { children: ReactNode; name: string; role: ProfileRole }) {
@@ -37,7 +37,7 @@ export function AdminShell({ children, name, role }: { children: ReactNode; name
   const isActive = (href: string) => href === '/admin' ? pathname === href : pathname.startsWith(href)
   const nav = (className: string) => <nav className={className} aria-label="Admin navigation">
     {visibleLinks.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={isActive(href) ? 'active' : ''}>
-      <Icon size={16} strokeWidth={1.8} />{label}
+      <Icon size={16} />{label}
     </Link>)}
   </nav>
 
@@ -45,17 +45,17 @@ export function AdminShell({ children, name, role }: { children: ReactNode; name
     <aside className="admin-sidebar">
       <Link href="/admin" className="admin-brand">
         <BrandMark />
-        <span><span className="brand-name">siaab<span className="brand-accent">.</span></span><span className="admin-brand-sub">Store management</span></span>
+        <span><span className="brand-name">siaab<span>mobile</span></span><span className="admin-brand-sub">Shop panel</span></span>
       </Link>
       {nav('admin-nav')}
       <div className="admin-sidebar-foot">
-        <Link href="/"><ArrowUpRight size={15} /> View storefront</Link>
-        <button type="button" disabled={signingOut} onClick={signOut}><LogOut size={15} />{signingOut ? 'Signing out…' : 'Sign out'}</button>
+        <Link href="/"><ArrowUpRight size={16} /> View storefront</Link>
+        <button type="button" disabled={signingOut} onClick={signOut}><LogOut size={16} />{signingOut ? 'Signing out…' : 'Sign out'}</button>
       </div>
     </aside>
     <main className="admin-workspace">
       <header className="admin-topbar">
-        <div><h1>Store management</h1><p>Keep your shop running smoothly.</p></div>
+        <h1>Siaab Mobile</h1>
         <div className="admin-top-actions"><span className="admin-profile"><span className="admin-avatar">{(name || 'S').slice(0, 1).toUpperCase()}</span><span>{name || 'Shop team'} · {role === 'staff' ? 'seller' : role}</span></span></div>
       </header>
       <div className="admin-content">{children}</div>

@@ -70,7 +70,7 @@ export function SettingsManager() {
   if (loading) return <div className="admin-empty">Loading owner settings…</div>
   if (!data) return <div className="admin-error" role="alert">{error || 'Settings could not be loaded.'}</div>
   return <section>
-    <div className="admin-page-heading"><div><h2>Owner settings</h2><p>Store details, trade-in values, sellers and backup tools.</p></div><BackupLink className="button button-outline button-small"><Download size={14} /> Export everything</BackupLink></div>
+    <div className="admin-page-heading"><div><h2>Owner settings</h2><p>Store details, trade-in values, sellers and backup tools</p></div><BackupLink className="button button-outline button-small"><Download size={16} /> Export everything</BackupLink></div>
     <div className="admin-alert"><strong>Backup reminder:</strong> <BackupStatus /> Download a fresh export monthly and keep it in a private, encrypted location. Never share the owner export; it contains private customer and inventory records.</div>
     {error && <div className="admin-error" role="alert">{error}</div>}{notice && <div className="admin-success" role="status">{notice}</div>}
     <TwoFactorCard />
@@ -92,13 +92,13 @@ export function SettingsManager() {
       <label className="admin-label">JSON multipliers and value ranges<textarea value={configText} onChange={(event) => setConfigText(event.target.value)} spellCheck={false} /></label>
       <p className="admin-inline-note">Values must follow the existing rule shape. Changes affect future public estimates immediately; test before saving.</p>
     </form>
-    <section className="admin-card" style={{ marginTop: 14 }}>
+    <section className="admin-card" style={{ marginTop: 16 }}>
       <div className="admin-card-title"><h3>Trade-in base values</h3><span>{data.tradeValues.length} phone / storage combinations</span></div>
       <form className="admin-toolbar" onSubmit={addValue}>
         <div className="admin-toolbar-left"><input className="admin-input" required placeholder="Brand" value={newValue.brand} onChange={(event) => setNewValue({ ...newValue, brand: event.target.value })} /><input className="admin-input" required placeholder="Model" value={newValue.model} onChange={(event) => setNewValue({ ...newValue, model: event.target.value })} /><input className="admin-input" required type="number" min="1" placeholder="Storage GB" value={newValue.storageGb} onChange={(event) => setNewValue({ ...newValue, storageGb: event.target.value })} /><input className="admin-input" required type="number" min="1" placeholder="Base value (ETB)" value={newValue.baseValue} onChange={(event) => setNewValue({ ...newValue, baseValue: event.target.value })} /></div>
-        <button className="button button-primary button-small" type="submit" disabled={saving}><Plus size={13} /> Add / update</button>
+        <button className="button button-primary button-small" type="submit" disabled={saving}><Plus size={16} /> Add / update</button>
       </form>
-      {data.tradeValues.length ? <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Device</th><th>Storage</th><th>Base value</th><th>Action</th></tr></thead><tbody>{data.tradeValues.map((row) => <tr key={row.id}><td><strong>{row.brand_text} {row.model_text}</strong></td><td>{row.storage_gb} GB</td><td>{price(row.base_value)}</td><td><button className="admin-icon-button danger" title="Remove value" onClick={() => void removeValue(row)}><Trash2 size={14} /></button></td></tr>)}</tbody></table></div> : <div className="admin-empty">No database trade-in values exist yet.</div>}
+      {data.tradeValues.length ? <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Device</th><th>Storage</th><th>Base value</th><th>Action</th></tr></thead><tbody>{data.tradeValues.map((row) => <tr key={row.id}><td><strong>{row.brand_text} {row.model_text}</strong></td><td>{row.storage_gb} GB</td><td>{price(row.base_value)}</td><td><button className="admin-icon-button danger" title="Remove value" onClick={() => void removeValue(row)}><Trash2 size={16} /></button></td></tr>)}</tbody></table></div> : <div className="admin-empty">No database trade-in values exist yet.</div>}
     </section>
     <SellersCard />
   </section>

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowRight, BadgeDollarSign, Boxes, ClipboardList, Smartphone, TriangleAlert } from 'lucide-react'
+import { ArrowRight, TriangleAlert } from 'lucide-react'
 import { AdminShell } from './admin-shell'
 import { SalesTrend } from './sales-trend'
 import { BackupLink, BackupStatus } from './backup-status'
@@ -39,14 +39,14 @@ export default async function AdminDashboard() {
 
   return <AdminShell name={profile.full_name} role={profile.role}>
     <div className="admin-page-heading">
-      <div><h2>Good day, {profile.full_name || 'shop team'}</h2><p>Here’s the latest from Siaab Mobile.</p></div>
-      <Link className="button button-primary" href="/admin/inventory">Manage inventory <ArrowRight size={14} /></Link>
+      <div><h2>Overview</h2><p>Sales, stock and customer requests</p></div>
+      <Link className="button button-primary" href="/admin/inventory">Manage inventory <ArrowRight size={16} /></Link>
     </div>
     <section className="admin-stat-grid" aria-label="Store overview">
-      <article className="admin-stat"><div className="admin-stat-head"><span>Phone models</span><span className="admin-stat-icon"><Smartphone size={15} /></span></div><strong className="admin-stat-value">{models.count ?? 0}</strong><span className="admin-stat-note">Models in your catalog</span></article>
-      <article className="admin-stat"><div className="admin-stat-head"><span>Stock items</span><span className="admin-stat-icon"><Boxes size={15} /></span></div><strong className="admin-stat-value">{(variants.count ?? 0) + (units.count ?? 0)}</strong><span className="admin-stat-note">New variants and used phones</span></article>
-      <article className="admin-stat"><div className="admin-stat-head"><span>New requests</span><span className="admin-stat-icon"><ClipboardList size={15} /></span></div><strong className="admin-stat-value">{leads.count ?? 0}</strong><span className="admin-stat-note">Waiting for a response</span></article>
-      <article className="admin-stat"><div className="admin-stat-head"><span>Sales · 7 days</span><span className="admin-stat-icon"><BadgeDollarSign size={15} /></span></div><strong className="admin-stat-value">{money(weekRevenue)}</strong><span className="admin-stat-note">{sales.data?.length ?? 0} recorded transactions</span></article>
+      <article className="admin-stat"><div className="admin-stat-head">Phone models</div><strong className="admin-stat-value">{models.count ?? 0}</strong><span className="admin-stat-note">Models in your catalog</span></article>
+      <article className="admin-stat"><div className="admin-stat-head">Stock items</div><strong className="admin-stat-value">{(variants.count ?? 0) + (units.count ?? 0)}</strong><span className="admin-stat-note">New variants and used phones</span></article>
+      <article className="admin-stat"><div className="admin-stat-head">New requests</div><strong className="admin-stat-value">{leads.count ?? 0}</strong><span className="admin-stat-note">Waiting for a response</span></article>
+      <article className="admin-stat"><div className="admin-stat-head">Sales · 7 days</div><strong className="admin-stat-value">{money(weekRevenue)}</strong><span className="admin-stat-note">{sales.data?.length ?? 0} recorded transactions</span></article>
     </section>
     <section className="admin-dashboard-grid">
       <article className="admin-card">
@@ -54,21 +54,21 @@ export default async function AdminDashboard() {
         <SalesTrend data={trend} />
       </article>
       <article className="admin-card">
-        <div className="admin-card-title"><h3>Stock to check</h3><Link href="/admin/inventory">View inventory <ArrowRight size={12} /></Link></div>
+        <div className="admin-card-title"><h3>Stock to check</h3><Link href="/admin/inventory">View inventory <ArrowRight size={16} /></Link></div>
         {lowStock.data?.length ? lowStock.data.map((item) => {
           const model = Array.isArray(item.phone_models) ? item.phone_models[0] : item.phone_models
-          return <div className="admin-alert-row" key={item.id}><strong>{model?.name}</strong><span>{item.stock_count === 0 ? 'Out of stock' : `${item.stock_count} left`}</span><span className={`admin-badge ${item.stock_count === 0 ? 'red' : 'amber'}`}><TriangleAlert size={10} /> {item.stock_count === 0 ? 'Restock' : 'Low'}</span></div>
+          return <div className="admin-alert-row" key={item.id}><strong>{model?.name}</strong><span>{item.stock_count === 0 ? 'Out of stock' : `${item.stock_count} left`}</span><span className={`admin-badge ${item.stock_count === 0 ? 'red' : 'amber'}`}><TriangleAlert size={16} /> {item.stock_count === 0 ? 'Restock' : 'Low'}</span></div>
         }) : <div className="admin-empty">All new-phone variants are above the low-stock threshold.</div>}
       </article>
       <article className="admin-card">
-        <div className="admin-card-title"><h3>Recent requests</h3><Link href="/admin/leads">See all <ArrowRight size={12} /></Link></div>
+        <div className="admin-card-title"><h3>Recent requests</h3><Link href="/admin/leads">See all <ArrowRight size={16} /></Link></div>
         {latestLeads.data?.length ? latestLeads.data.map((lead) => <div className="admin-alert-row" key={lead.id}><strong>{lead.name}<small>{lead.type.replace('_', ' ')} · {lead.contact}</small></strong><span>{new Date(lead.created_at).toLocaleDateString()}</span><span className={`admin-badge ${lead.status === 'new' ? 'amber' : 'gray'}`}>{lead.status}</span></div>) : <div className="admin-empty">No customer requests yet.</div>}
       </article>
       <article className="admin-card">
         <div className="admin-card-title"><h3>Quick links</h3><span>Common tasks</span></div>
-        <div className="admin-alert-row"><strong>Add a phone</strong><Link href="/admin/inventory?add=1">Create a model <ArrowRight size={12} /></Link></div>
-        <div className="admin-alert-row"><strong>Record a transaction</strong><Link href="/admin/sales">Open sales <ArrowRight size={12} /></Link></div>
-        {profile.role === 'owner' && <div className="admin-alert-row"><strong>Export a backup</strong><BackupStatus /><BackupLink>Download ZIP <ArrowRight size={12} /></BackupLink></div>}
+        <div className="admin-alert-row"><strong>Add a phone</strong><Link href="/admin/inventory?add=1">Create a model <ArrowRight size={16} /></Link></div>
+        <div className="admin-alert-row"><strong>Record a transaction</strong><Link href="/admin/sales">Open sales <ArrowRight size={16} /></Link></div>
+        {profile.role === 'owner' && <div className="admin-alert-row"><strong>Export a backup<small className="admin-wrap"><BackupStatus /></small></strong><BackupLink>Download ZIP <ArrowRight size={16} /></BackupLink></div>}
       </article>
     </section>
   </AdminShell>
