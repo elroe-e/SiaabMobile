@@ -10,5 +10,6 @@ export const shop = {
   address: 'Megenagna Marathon Building, 1st floor, No. 34, Addis Ababa',
   hours: 'Monday–Saturday, 9:00 AM–7:00 PM',
   mapUrl: 'https://maps.google.com/?q=Megenagna+Marathon+Building+Addis+Ababa',
+  second: null as { address: string; mapUrl: string } | null,
   siteUrl: 'https://siaabmobile.com',
 }

@@ -14,7 +14,13 @@ const tradeConfigSchema = z.object({
   range: z.object({ min: z.number().min(0).max(2), max: z.number().min(0).max(2) }),
 }).strict()
 
+// Shown to customers as a link, so only real web addresses are accepted.
+const mapLink = z.string().trim().max(500).refine((value) => value === '' || value.startsWith('https://'), 'A map link must start with https://')
+
 const settingsSchema = z.object({
+  mapUrl: mapLink.optional(),
+  address2: z.string().trim().max(400).optional(),
+  mapUrl2: mapLink.optional(),
   name: z.string().trim().min(1).max(100).optional(),
   phone: z.string().trim().min(3).max(40).optional(),
   whatsapp: z.string().trim().min(3).max(40).optional(),
@@ -50,9 +56,12 @@ export async function PATCH(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid settings.' }, { status: 400 })
   try {
     const { db } = await requireAdmin('owner')
-    const { tradeConfig, soldBadgeDays, lowStockDefault, ...basic } = parsed.data
+    const { tradeConfig, soldBadgeDays, lowStockDefault, mapUrl, address2, mapUrl2, ...basic } = parsed.data
     const settings = {
       ...basic,
+      ...(mapUrl !== undefined ? { map_url: mapUrl } : {}),
+      ...(address2 !== undefined ? { address_2: address2 } : {}),
+      ...(mapUrl2 !== undefined ? { map_url_2: mapUrl2 } : {}),
       ...(soldBadgeDays !== undefined ? { sold_badge_days: soldBadgeDays } : {}),
       ...(lowStockDefault !== undefined ? { low_stock_default: lowStockDefault } : {}),
       updated_at: new Date().toISOString(),

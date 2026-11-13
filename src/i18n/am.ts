@@ -181,6 +181,7 @@ export const amharic: Record<string, string> = {
   "-month warranty": "-ወር ዋስትና",
   "Included with your purchase": "ከግዢዎ ጋር ተካቷል",
   "Call the shop": "ሱቁን ደውሉ",
+  "Our second shop": "ሁለተኛው ሱቃችን",
   "We can’t show our phones right now. Please call the shop on": "አሁን ስልኮቻችንን ማሳየት አልቻልንም። እባክዎ ሱቁን ይደውሉ፦",
   "Order on WhatsApp": "በዋትስአፕ ይዘዙ",
   "Ask when it’s back": "ሲመለስ ይጠይቁ",

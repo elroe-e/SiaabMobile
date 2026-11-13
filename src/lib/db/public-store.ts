@@ -22,6 +22,8 @@ function dateSort(value: string) {
   return `${year}-12-31`
 }
 
+const searchMap = (address: string) => `https://maps.google.com/?q=${encodeURIComponent(address)}`
+
 function stringifySpec(value: unknown): string {
   if (typeof value === 'string') return value
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
@@ -81,7 +83,9 @@ export async function getPublicStoreData(): Promise<StoreData> {
     email: settings.email,
     address: settings.address,
     hours: settings.hours,
-    mapUrl: `https://maps.google.com/?q=${encodeURIComponent(settings.address)}`,
+    // The owner's exact map link wins; without one, the address is searched on Google Maps.
+    mapUrl: settings.map_url || searchMap(settings.address),
+    second: settings.address_2 ? { address: settings.address_2, mapUrl: settings.map_url_2 || searchMap(settings.address_2) } : null,
   } : sampleShop
 
   return {

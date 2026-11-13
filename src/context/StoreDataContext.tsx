@@ -20,6 +20,8 @@ export type StoreInfo = {
   address: string
   hours: string
   mapUrl: string
+  /** The second shop, when the owner has added one. */
+  second: { address: string; mapUrl: string } | null
   siteUrl: string
 }
 

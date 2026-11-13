@@ -176,9 +176,11 @@ export function Footer() {
         </div>
         <div className="footer-column"><h3>{t("Explore")}</h3><Link href="/phones">{t("Shop phones")}</Link><Link href="/upcoming">{t("Coming soon")}</Link><Link href="/trade-in">{t("Trade-in estimate")}</Link></div>
         <div className="footer-column"><h3>{t("Say hello")}</h3><a href={`tel:${shop.phones[0]}`}>{shop.phones[0]}</a><a href={shop.telegram} target="_blank" rel="noreferrer">{t("Telegram")}</a><Link href="/contact">{t("Visit our store")}</Link></div>
-        <div className="footer-address"><span className="eyebrow">{t("Find us in Addis")}</span><p>{shop.address}</p><p>{shop.hours}</p><a href={shop.mapUrl} target="_blank" rel="noreferrer" className="text-link">{t("Get directions")} <ArrowUpRight size={15} /></a></div>
+        <div className="footer-address"><span className="eyebrow">{t("Find us in Addis")}</span><p>{shop.address}</p><p>{shop.hours}</p><a href={shop.mapUrl} target="_blank" rel="noreferrer" className="text-link">{t("Get directions")} <ArrowUpRight size={15} /></a>{shop.second && <><p>{t("Our second shop")}: {shop.second.address}</p><a href={shop.second.mapUrl} target="_blank" rel="noreferrer" className="text-link">{t("Get directions")} <ArrowUpRight size={15} /></a></>}</div>
       </div>
       <div className="container footer-bottom"><span>© {new Date().getFullYear()} {shop.name}{t(". All rights reserved.")}</span><span>{t("Prices and availability may change. Confirm with our team before visiting.")}</span></div>
+      {/* The developer's credit; the developer is not the shop owner. */}
+      <div className="container footer-credit"><span>Website by <a href="https://t.me/ELR0E" target="_blank" rel="noreferrer">Elroe Fikremariam</a></span><a href="tel:+251994261461">+251994261461</a><a href="https://t.me/ELR0E" target="_blank" rel="noreferrer">Telegram</a><a href="https://www.instagram.com/elroe_e" target="_blank" rel="noreferrer">Instagram</a></div>
     </footer>
   )
 }

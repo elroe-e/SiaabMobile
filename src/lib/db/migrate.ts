@@ -13,6 +13,13 @@ const MIGRATIONS = [
   // The Add-phone form saves unconfirmed phones as hidden drafts; the public views already hide them,
   // and publishing still requires confirmed specs (create_inventory), so this gate only blocked drafts.
   { version: '002_allow_unconfirmed_drafts', sql: 'drop trigger if exists phone_models_review_gate on public.phone_models' },
+  // The owner can paste an exact Google Maps link for the shop, and add a second shop with its own link.
+  {
+    version: '003_shop_locations',
+    sql: `alter table public.shop_settings add column map_url text not null default '', add column address_2 text not null default '', add column map_url_2 text not null default '';
+      create or replace view public.public_shop_settings with (security_barrier = true) as
+      select name, currency, phone, whatsapp, telegram, email, address, hours, map_url, address_2, map_url_2 from public.shop_settings where id = 1;`,
+  },
 ]
 const LOCK_ID = 727_001
 

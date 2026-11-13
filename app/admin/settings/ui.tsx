@@ -8,7 +8,7 @@ import { Download, Plus, Trash2 } from 'lucide-react'
 
 type TradeValue = { id: string; brand_text: string; model_text: string; storage_gb: number; base_value: number }
 type Config = Record<string, unknown>
-type Settings = { name: string; phone: string; whatsapp: string; telegram: string; email: string; address: string; hours: string; sold_badge_days: number; low_stock_default: number }
+type Settings = { name: string; phone: string; whatsapp: string; telegram: string; email: string; address: string; map_url: string; address_2: string; map_url_2: string; hours: string; sold_badge_days: number; low_stock_default: number }
 type LoadedSettings = { settings: Settings; tradeConfig: Config; tradeValues: TradeValue[] }
 const price = (value: number) => new Intl.NumberFormat('en-ET', { style: 'currency', currency: 'ETB', maximumFractionDigits: 0 }).format(Number(value))
 
@@ -42,7 +42,7 @@ export function SettingsManager() {
     const s = data.settings
     const response = await fetch('/api/admin/settings', {
       method: 'PATCH', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: s.name, phone: s.phone, whatsapp: s.whatsapp, telegram: s.telegram, email: s.email, address: s.address, hours: s.hours, soldBadgeDays: Number(s.sold_badge_days), lowStockDefault: Number(s.low_stock_default), tradeConfig }),
+      body: JSON.stringify({ name: s.name, phone: s.phone, whatsapp: s.whatsapp, telegram: s.telegram, email: s.email, address: s.address, mapUrl: s.map_url, address2: s.address_2, mapUrl2: s.map_url_2, hours: s.hours, soldBadgeDays: Number(s.sold_badge_days), lowStockDefault: Number(s.low_stock_default), tradeConfig }),
     })
     const result = await response.json()
     setSaving(false)
@@ -84,6 +84,9 @@ export function SettingsManager() {
         <label className="admin-label">Telegram link<input value={data.settings.telegram} onChange={(event) => updateSetting('telegram', event.target.value)} /></label>
         <label className="admin-label">Opening hours<input value={data.settings.hours} onChange={(event) => updateSetting('hours', event.target.value)} /></label>
         <label className="admin-label full">Shop address<input value={data.settings.address} onChange={(event) => updateSetting('address', event.target.value)} /></label>
+        <label className="admin-label full">Shop map link<input type="url" placeholder="https://maps.app.goo.gl/…" value={data.settings.map_url} onChange={(event) => updateSetting('map_url', event.target.value)} /><span className="admin-inline-note">Open the shop in Google Maps, tap Share, copy the link and paste it here. Customers who tap “Get directions” land on that exact spot.</span></label>
+        <label className="admin-label full">Second shop address (optional)<input value={data.settings.address_2} onChange={(event) => updateSetting('address_2', event.target.value)} /></label>
+        <label className="admin-label full">Second shop map link<input type="url" placeholder="https://maps.app.goo.gl/…" value={data.settings.map_url_2} onChange={(event) => updateSetting('map_url_2', event.target.value)} /></label>
         <label className="admin-label">Sold badge (days)<input type="number" min="0" max="30" value={data.settings.sold_badge_days} onChange={(event) => updateSetting('sold_badge_days', Number(event.target.value))} /></label>
         <label className="admin-label">Low-stock alert threshold<input type="number" min="0" max="100" value={data.settings.low_stock_default} onChange={(event) => updateSetting('low_stock_default', Number(event.target.value))} /></label>
       </div>

@@ -25,6 +25,13 @@ describe('what the shop pages load', () => {
     expect(offline).toBe(false)
     expect(catalog.map((phone) => [phone.slug, phone.price])).toEqual([['galaxy-a55', 50000]])
     expect(storeData.upcomingPhones).toEqual([])
+    // Without a pasted link the address is searched; a pasted link and a second shop show as saved.
+    expect(storeData.shop.mapUrl).toContain('maps.google.com/?q=')
+    expect(storeData.shop.second).toBeNull()
+    await test.pg.query("update public.shop_settings set map_url = 'https://maps.app.goo.gl/one', address_2 = 'Bole, Addis Ababa', map_url_2 = 'https://maps.app.goo.gl/two'")
+    const { shop } = (await loadStorefront()).storeData
+    expect(shop.mapUrl).toBe('https://maps.app.goo.gl/one')
+    expect(shop.second).toEqual({ address: 'Bole, Addis Ababa', mapUrl: 'https://maps.app.goo.gl/two' })
     await test.close()
   })
 
