@@ -1,0 +1,26 @@
+name: Check the live database
+
+# Run by hand: Actions > Check the live database > Run workflow.
+# It sells, undoes and reserves a throwaway phone on the server's database inside a transaction that is always
+# cancelled, to prove selling works there. Nothing is saved. This log is public, so the script prints no addresses.
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run the selling check on the server
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ vars.SSH_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          # Pinned host key: refuse to talk to anything but the real server.
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # The activate script gives the command the app's own settings, including the database address.
+          ssh -i "$HOME/.ssh/deploy" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes "$SSH_USER@$SSH_HOST" \
+            'source ~/nodevenv/siaabmobile/20/bin/activate && cd ~/siaabmobile && node check-database.mjs'

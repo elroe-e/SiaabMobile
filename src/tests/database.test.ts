@@ -2,6 +2,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createDbClient } from '../lib/db/client'
 import { createTestDatabase } from './test-database'
+import { checkSelling } from '../../scripts/check-database.mjs'
 
 let test: Awaited<ReturnType<typeof createTestDatabase>>
 let owner: ReturnType<typeof createDbClient>
@@ -108,6 +109,38 @@ describe('permissions the database still enforces', () => {
       expect((await publicDb.rpc('submit_public_lead', { p_type: 'notify_me', p_name: 'Abebe', p_contact: '+251911000000', p_payload: { model: 'Pixel 10' } })).error).toBeNull()
     }
     expect((await publicDb.rpc('submit_public_lead', { p_type: 'notify_me', p_name: 'Abebe', p_contact: '+251911000000', p_payload: {} })).error?.message).toMatch(/Too many requests/)
+  })
+})
+
+describe('the selling check script', () => {
+  // Runs the script's steps as an owner inside a transaction that is cancelled, the way the script itself does.
+  const runCheck = async (before = '') => {
+    const ownerId = await test.addProfile('owner')
+    let steps: { name: string; ok: boolean; problem?: string }[] = []
+    await test.pg.transaction(async (tx) => {
+      await tx.query("select set_config('app.user_id', $1, true), set_config('app.role', 'owner', true)", [ownerId])
+      if (before) await tx.exec(before)
+      steps = await checkSelling(async (text: string, params?: unknown[]) => (await tx.query(text, params)).rows)
+      await tx.rollback()
+    })
+    return steps
+  }
+
+  it('passes every step on a healthy database and leaves nothing behind', async () => {
+    const steps = await runCheck()
+    expect(steps.map((step) => [step.name, step.ok])).toEqual([
+      ['Add a new phone', true], ['Sell one of it', true], ['Undo that sale', true],
+      ['Add a used phone', true], ['Reserve the used phone', true], ['Sell the used phone', true], ['Undo the used-phone sale', true],
+    ])
+    const { rows } = await test.pg.query<{ phones: number; sales: number }>("select (select count(*)::int from public.phone_models where slug like 'database-check-%') as phones, (select count(*)::int from public.sales where buyer_note = 'database check') as sales")
+    expect(rows[0]).toEqual({ phones: 0, sales: 0 })
+  })
+
+  it('names the broken step and still checks the steps that do not depend on it', async () => {
+    const steps = await runCheck('drop function public.sell_variant(uuid, integer, numeric, text)')
+    expect(steps.filter((step) => !step.ok).map((step) => step.name)).toEqual(['Sell one of it', 'Undo that sale'])
+    expect(steps.find((step) => step.name === 'Sell one of it')?.problem).toMatch(/sell_variant/)
+    expect(steps.find((step) => step.name === 'Sell the used phone')?.ok).toBe(true)
   })
 })
 

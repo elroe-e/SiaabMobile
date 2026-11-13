@@ -49,6 +49,8 @@ The site uses a PostgreSQL database (on cPanel: **PostgreSQL Databases**; the se
    It asks for the database address (the same `DATABASE_URL`), the owner's email, name and password. Run it again any time to reset the owner's password; add `--remove-two-factor` if the owner lost their authenticator phone.
 5. Sign in at `/admin/login`. Sellers are added, reset and removed by the owner in **Settings → Sellers**. There is no public sign-up.
 
+To check that selling works on the server's database, run `node check-database.mjs` in the same Terminal, or run **Actions → Check the live database** on GitHub. It sells, undoes and reserves a throwaway phone inside a transaction that is always cancelled, so nothing is saved.
+
 Photos are saved in `~/siaab-photos` (outside the app folder, so deploys never delete them). Set `PHOTOS_DIR` to use another folder.
 
 With `DATABASE_URL` unset the storefront shows the editable sample catalog and the admin sign-in explains what is missing.

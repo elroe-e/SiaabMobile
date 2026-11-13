@@ -13,8 +13,8 @@ const app = join('.next', 'standalone')
 // The standalone server does not include the browser files; they have to sit next to it.
 cpSync('public', join(app, 'public'), { recursive: true })
 cpSync(join('.next', 'static'), join(app, '.next', 'static'), { recursive: true })
-// The owner set-up script runs from the cPanel Terminal inside the app folder.
-cpSync(join('scripts', 'set-owner.mjs'), join(app, 'set-owner.mjs'))
+// The owner set-up script and the selling check run from the cPanel Terminal inside the app folder.
+for (const script of ['set-owner.mjs', 'check-database.mjs']) cpSync(join('scripts', script), join(app, script))
 // Secrets stay out of the upload; they go in the cPanel environment variables instead.
 for (const file of ['.env', '.env.local', '.env.production']) rmSync(join(app, file), { force: true })
 
