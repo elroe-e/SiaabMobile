@@ -1,10 +1,10 @@
 'use client'
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
-  ArrowLeft, ArrowRight, ArrowUpRight, Check, LayoutGrid, ChevronDown, CircleHelp,
+  ArrowLeft, ArrowRight, ArrowUpRight, CalendarCheck, Check, LayoutGrid, ChevronDown, CircleHelp,
   Clock3, CreditCard, MapPin, MessageCircle, PackageCheck, PhoneCall, Search, ShieldCheck, Smartphone,
   Sparkles, X,
 } from 'lucide-react'
@@ -106,12 +106,12 @@ function Home() {
       const logo = brandLogo(brand)
       return <Link href={`/phones?brand=${encodeURIComponent(brand)}`} key={brand}>{logo && <svg viewBox="0 0 24 24" aria-hidden="true"><path d={logo.path} /></svg>}{brand}</Link>
     })}</div></section>}
-    <section className="section faq-section"><div className="container faq-layout"><div><span className="eyebrow">{t("The important bits")}</span><h2>{t("Good questions")}<br />{t("Straight answers")}</h2><p>{t("Still unsure? Talk to a real person on WhatsApp or visit us in store.")}</p><a className="text-link" href={createWhatsAppUrl(`Hello ${shop.name}, I have a question.`, shop.whatsapp[0])} target="_blank" rel="noreferrer">{t("Ask us anything")} <ArrowUpRight size={16} /></a></div><div className="faq-list">{[
+    <section className="section faq-section"><div className="container faq-layout"><div><span className="eyebrow">{t("The important bits")}</span><h2>{t("Good questions")}<br />{t("Straight answers")}</h2><p>{t("Still unsure? Call us, message us or visit us in store.")}</p><Link className="text-link" href="/contact">{t("Ask us anything")} <ArrowUpRight size={16} /></Link></div><div className="faq-list">{[
       ['Are your phones genuine?', 'Yes. We carefully source our phones and check each device before it reaches the shelf. Ask our team about a specific model any time.'],
       ['Does every phone include a warranty?', 'Most new devices include a 12-month shop warranty. Refurbished devices have a clearly noted warranty period on their product page.'],
       ['Can I trade in a phone that is not listed?', 'Absolutely. Select “Other / not listed” in the estimator and send us a few details. Our team will help with a manual quote.'],
       ['How can I pay for my phone?', 'We do not accept online payments. Pay in person at our shop after checking your chosen phone with our team.'],
-      ['Can you deliver?', 'Contact us on WhatsApp to confirm current delivery options and charges for your area.'],
+      ['Can you deliver?', 'Call or message us to confirm current delivery options and charges for your area.'],
     ].map(([question, answer], index) => <div className={`faq-item ${faq === index ? 'faq-open' : ''}`} key={question}><button type="button" aria-expanded={faq === index} onClick={() => setFaq(faq === index ? null : index)}><span>{t(question ?? '')}</span><ChevronDown size={18} /></button>{faq === index && <p>{t(answer ?? '')}</p>}</div>)}</div></div></section>
     <section className="visit-strip container"><div className="visit-icon"><MapPin size={21} /></div><div><span className="eyebrow">{t("Come say hello")}</span><strong>{t("Find us in Megenagna, Addis Ababa.")}</strong><small>{shop.address}</small></div><a href={shop.mapUrl} target="_blank" rel="noreferrer" className="button button-light">{t("View on map")} <ArrowUpRight size={16} /></a></section>
   </div>
@@ -251,9 +251,44 @@ function PhoneDetail() {
   </div>
 }
 
+type LeadRequest = { type: 'trade_in' | 'notify_me' | 'contact'; name: string; contact: string; payload: Record<string, unknown> }
+const saveFailed = 'We could not save your request.'
+
+/** One request form's progress. The saved request is how the shop hears about it, so a form only confirms once the save succeeded. */
+function useLeadForm() {
+  const [status, setStatus] = useState<'idle' | 'sending' | 'saved'>('idle')
+  const [problem, setProblem] = useState('')
+  const send = async (lead: LeadRequest) => {
+    if (status === 'sending') return
+    setStatus('sending')
+    setProblem('')
+    const reason = await fetch('/api/leads', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(lead) })
+      .then(async (response) => response.ok ? '' : ((await response.json().catch(() => ({}))) as { error?: string }).error ?? saveFailed)
+      .catch(() => saveFailed)
+    setProblem(reason)
+    setStatus(reason ? 'idle' : 'saved')
+  }
+  const reset = () => { setStatus('idle'); setProblem('') }
+  return { status, problem, send, reset }
+}
+
+/** Confirms a saved request. WhatsApp stays as an extra for customers who use it; many do not. */
+function RequestSaved({ text, whatsappUrl, headingId, children }: { text: string; whatsappUrl: string; headingId?: string; children?: ReactNode }) {
+  const t = useT()
+  return <div className="request-saved" role="status"><span className="success-icon"><Check /></span><h2 id={headingId}>{t("Request received")}</h2><p>{text}</p><a href={whatsappUrl} target="_blank" rel="noreferrer" className="button button-whatsapp"><MessageCircle size={17} />{t("Send it on WhatsApp too")}</a>{children}</div>
+}
+
+/** Says why a request was not saved and offers the ways to reach the shop that still work. */
+function RequestFailed({ problem, whatsappUrl }: { problem: string; whatsappUrl: string }) {
+  const t = useT()
+  const { shop } = useStoreData()
+  return <div className="form-error" role="alert">{t(problem)}<span className="reach-shop"><a href={telLink(shop.phones[0] ?? '')}>{t("Call the shop")}</a><a href={whatsappUrl} target="_blank" rel="noreferrer">{t("Send on WhatsApp")}</a></span></div>
+}
+
 function Upcoming() {
   const t = useT()
   const { shop, upcomingPhones } = useStoreData()
+  const lead = useLeadForm()
   const [selected, setSelected] = useState<UpcomingPhone | null>(null)
   const dialogRef = useRef<HTMLElement>(null)
   const notifyTrigger = useRef<HTMLButtonElement | null>(null)
@@ -284,9 +319,12 @@ function Upcoming() {
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [selected])
+  // The Done button takes focus once the request is saved, because the button that had it is gone.
+  useEffect(() => { if (lead.status === 'saved') dialogRef.current?.querySelector<HTMLElement>('.request-saved button')?.focus() }, [lead.status])
   const close = () => {
     setSelected(null)
     setError(t(''))
+    lead.reset()
     window.setTimeout(() => notifyTrigger.current?.focus(), 0)
   }
   const notify = (event: FormEvent<HTMLFormElement>) => {
@@ -295,28 +333,16 @@ function Upcoming() {
       setError(t('Please add your name and one way to reach you.'))
       return
     }
-    const message = `Hello ${shop.name}, please let me know when ${fullPhoneName(selected.brand, selected.model)} is available.\nName: ${name.trim()}\nContact: ${contact.trim()}`
-    const popup = window.open(createWhatsAppUrl(message, shop.whatsapp[0]), '_blank', 'noopener,noreferrer')
-    void fetch('/api/leads', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ type: 'notify_me', name: name.trim(), contact: contact.trim(), payload: { model: `${fullPhoneName(selected.brand, selected.model)}` } }),
-    }).then(async (response) => {
-      if (!response.ok) {
-        const result = await response.json().catch(() => ({}))
-        window.alert(result.error ?? 'Your WhatsApp message is ready, but the request was not saved to the shop inbox.')
-      }
-    }).catch(() => window.alert('Your WhatsApp message is ready, but the request could not be saved to the shop inbox.'))
-    if (!popup) window.location.assign(createWhatsAppUrl(message, shop.whatsapp[0]))
-    close()
-    setName('')
-    setContact('')
+    setError('')
+    void lead.send({ type: 'notify_me', name: name.trim(), contact: contact.trim(), payload: { model: fullPhoneName(selected.brand, selected.model) } })
   }
+  const whatsappUrl = selected ? createWhatsAppUrl(`Hello ${shop.name}, please let me know when ${fullPhoneName(selected.brand, selected.model)} is available.\nName: ${name.trim()}\nContact: ${contact.trim()}`, shop.whatsapp[0]) : ''
   return <div className="container page-container upcoming-page">
     <div className="page-intro"><div><span className="eyebrow">{t("A sneak peek")}</span><h1>{t("Coming into view")}</h1><p>{t("Keep an eye on these upcoming devices. We’ll share news as soon as we have it.")}</p></div><span className="notice-badge"><Sparkles size={17} />{t("Dates & specs are unconfirmed")}</span></div>
     {upcomingPhones.length === 0 && <div className="empty-state"><span className="empty-icon"><Sparkles size={23} /></span><h2>{t("Nothing announced yet")}</h2><p>{t("New arrivals appear here first. Check back soon, or ask the shop what’s on the way.")}</p><Link href="/phones" className="button button-primary">{t("View all phones")}</Link></div>}
     <div className="upcoming-grid">{[...upcomingPhones].sort((a, b) => a.dateSort.localeCompare(b.dateSort)).map((phone) => <article className="upcoming-card" key={phone.id}><div className="upcoming-art"><img src={phone.image} alt={`${fullPhoneName(phone.brand, phone.model)} concept artwork`} loading="lazy" /><span className="pill">{t("Coming soon")}</span><span className="upcoming-date">{phone.expectedDate}</span></div><div className="upcoming-card-content"><span className="eyebrow">{phone.brand.toUpperCase()} {t("· Expected")} {phone.expectedDate.toUpperCase()}</span><h2>{phone.model}</h2><p>{phone.teaser}</p><div className="rumor-list">{phone.keyRumoredSpecs.map((spec) => <span key={spec}><span />{spec}</span>)}</div><div className="upcoming-price"><small>{t("Expected price range")}</small><strong>{phone.expectedPriceRange}</strong></div><button type="button" className="button button-outline button-full" onClick={(event) => { notifyTrigger.current = event.currentTarget; setSelected(phone) }}>{t("Let me know when it’s here")} <ArrowRight size={16} /></button></div></article>)}</div>
     {upcomingPhones.length > 0 && <div className="upcoming-disclaimer"><CircleHelp size={19} /><p><strong>{t("A note about upcoming phones")}</strong><br />{t("Dates, prices and specifications are indicative only and can change. Availability and details are not confirmed until the shop verifies local stock.")}</p></div>}
-    {selected && <div className="modal-backdrop" onClick={close}><section ref={dialogRef} className="notify-modal" role="dialog" aria-modal="true" aria-labelledby="notify-title" onClick={(event) => event.stopPropagation()}><button type="button" aria-label={t("Close dialog")} className="modal-close" onClick={close}><X /></button><span className="eyebrow">{t("Keep me in the loop")}</span><h2 id="notify-title">{t("A heads-up, when it’s here")}</h2><p>{t("Leave your details and we’ll send a message to the shop so the team can follow up when")} <strong>{fullPhoneName(selected.brand, selected.model)}</strong> {t("arrives.")}</p><form onSubmit={notify}><label className="field-label">{t("Your name")}<input autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} required /></label><label className="field-label">{t("Phone, Telegram or email")}<input value={contact} onChange={(event) => setContact(event.target.value)} required placeholder={t("+251 … / @username / email")} /></label>{error && <p className="form-error" role="alert">{error}</p>}<button type="submit" className="button button-whatsapp button-full"><MessageCircle size={17} />{t("Send my request")}</button><small className="modal-privacy">{t("This opens WhatsApp so you can review the message before sending. Your request is also saved so the team can follow up.")}</small></form></section></div>}
+    {selected && <div className="modal-backdrop" onClick={close}><section ref={dialogRef} className="notify-modal" role="dialog" aria-modal="true" aria-labelledby="notify-title" onClick={(event) => event.stopPropagation()}><button type="button" aria-label={t("Close dialog")} className="modal-close" onClick={close}><X /></button>{lead.status === 'saved' ? <RequestSaved headingId="notify-title" text={t("We’ll contact you as soon as it arrives.")} whatsappUrl={whatsappUrl}><button type="button" className="button button-outline" onClick={close}>{t("Done")}</button></RequestSaved> : <><span className="eyebrow">{t("Keep me in the loop")}</span><h2 id="notify-title">{t("A heads-up, when it’s here")}</h2><p>{t("Leave your details and we’ll send a message to the shop so the team can follow up when")} <strong>{fullPhoneName(selected.brand, selected.model)}</strong> {t("arrives.")}</p><form onSubmit={notify}><label className="field-label">{t("Your name")}<input autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} required /></label><label className="field-label">{t("Phone, Telegram or email")}<input value={contact} onChange={(event) => setContact(event.target.value)} required placeholder={t("+251 … / @username / email")} /></label>{error && <p className="form-error" role="alert">{error}</p>}{lead.problem && <RequestFailed problem={lead.problem} whatsappUrl={whatsappUrl} />}<button type="submit" className="button button-primary button-full" disabled={lead.status === 'sending'}>{lead.status === 'sending' ? t("Sending…") : t("Send my request")}</button><small className="modal-privacy">{t("We save your request and contact you when it arrives.")}</small></form></>}</section></div>}
   </div>
 }
 
@@ -349,7 +375,8 @@ export function TradeIn() {
   const [targetSlug, setTargetSlug] = useState(searchParams.get('target') ?? '')
   const [manualName, setManualName] = useState('')
   const [manualContact, setManualContact] = useState('')
-  const [manualSent, setManualSent] = useState(false)
+  const booking = useLeadForm()
+  const manual = useLeadForm()
   const [bookOpen, setBookOpen] = useState(false)
   const [bookName, setBookName] = useState('')
   const [bookContact, setBookContact] = useState('')
@@ -365,24 +392,11 @@ export function TradeIn() {
     setAnswered((current) => current.includes(key) ? current : [...current, key])
   }
   const picked = (key: string) => answered.includes(key)
+  const bookingUrl = estimate ? createWhatsAppUrl(`${tradeInMessage(fullPhoneName(brand, model), `${storage} GB`, answers, estimate, shop.name)}\nName: ${bookName.trim()}\nContact: ${bookContact.trim()}`, shop.whatsapp[0]) : ''
   const bookInspection = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!estimate || !bookName.trim() || !bookContact.trim()) return
-    const message = tradeInMessage(`${fullPhoneName(brand, model)}`, `${storage} GB`, answers, estimate, shop.name)
-    const url = createWhatsAppUrl(`${message}
-Name: ${bookName.trim()}
-Contact: ${bookContact.trim()}`, shop.whatsapp[0])
-    const popup = window.open(url, '_blank', 'noopener,noreferrer')
-    void fetch('/api/leads', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ type: 'trade_in', name: bookName.trim(), contact: bookContact.trim(), payload: { model: `${fullPhoneName(brand, model)}`, storageGb: Number(storage), answers, estimate: estimate.estimate, target: target?.model } }),
-    }).then(async (response) => {
-      if (!response.ok) {
-        const result = await response.json().catch(() => ({}))
-        window.alert(result.error ?? 'Your WhatsApp message is ready, but the request was not saved to the shop inbox.')
-      }
-    }).catch(() => window.alert('Your WhatsApp message is ready, but the request could not be saved to the shop inbox.'))
-    if (!popup) window.location.assign(url)
+    void booking.send({ type: 'trade_in', name: bookName.trim(), contact: bookContact.trim(), payload: { model: fullPhoneName(brand, model), storageGb: Number(storage), answers, estimate: estimate.estimate, target: target?.model } })
   }
   const validateStep = () => {
     if (step === 1 && (!brand || !model || (!isOther && !storage))) {
@@ -408,24 +422,12 @@ Contact: ${bookContact.trim()}`, shop.whatsapp[0])
   }
   const reset = () => {
     setStep(1); setBrand(''); setModel(''); setStorage(''); setOtherModel(''); setQuery('')
-    setAnswers(defaultAnswers); setAnswered([]); setError(t('')); setMode('estimate'); setManualSent(false)
+    setAnswers(defaultAnswers); setAnswered([]); setError(t('')); setMode('estimate'); setBookOpen(false); booking.reset(); manual.reset()
   }
+  const manualUrl = createWhatsAppUrl(`Hello ${shop.name}, I need a manual trade-in quote.\nPhone: ${brand} ${otherModel || 'model not listed'}\nName: ${manualName}\nContact: ${manualContact}`, shop.whatsapp[0])
   const manualSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const text = `Hello ${shop.name}, I need a manual trade-in quote.\nPhone: ${brand} ${otherModel || 'model not listed'}\nName: ${manualName}\nContact: ${manualContact}`
-    const url = createWhatsAppUrl(text, shop.whatsapp[0])
-    const popup = window.open(url, '_blank', 'noopener,noreferrer')
-    void fetch('/api/leads', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ type: 'trade_in', name: manualName.trim(), contact: manualContact.trim(), payload: { model: `${brand} ${otherModel || 'not listed'}`, request: 'Manual trade-in quote' } }),
-    }).then(async (response) => {
-      if (!response.ok) {
-        const result = await response.json().catch(() => ({}))
-        window.alert(result.error ?? 'Your WhatsApp message is ready, but your request was not saved to the shop inbox.')
-      }
-    }).catch(() => window.alert('Your WhatsApp message is ready, but your request could not be saved to the shop inbox.'))
-    if (!popup) window.location.assign(url)
-    setManualSent(true)
+    void manual.send({ type: 'trade_in', name: manualName.trim(), contact: manualContact.trim(), payload: { model: `${brand} ${otherModel || 'not listed'}`, request: 'Manual trade-in quote' } })
   }
   const target = phones.find((phone) => phone.slug === targetSlug)
   const targetPrice = target?.storageOptions[0]?.price ?? target?.price ?? 0
@@ -434,7 +436,7 @@ Contact: ${bookContact.trim()}`, shop.whatsapp[0])
     <div className="trade-intro"><span className="eyebrow"><span className="eyebrow-dot" /> {t("Goodbye old phone, hello next")}</span><h1>{t("Give your old phone")}<br />{t("a")} <em>{t("new beginning")}</em></h1><p>{t("Answer a few quick questions and see what your phone could be worth toward your next upgrade.")}</p><div className="trade-trust"><span><Check size={15} />{t("Takes about 2 minutes")}</span><span><Check size={15} />{t("No obligation, ever")}</span></div></div>
     <div className="trade-layout"><aside className="trade-aside"><div className="trade-aside-illustration"><div className="trade-phone-shape"><Smartphone size={41} /></div><div className="trade-sparkle">✦</div><div className="trade-orbit" /></div><span className="eyebrow">{t("How it works")}</span><h2>{t("A better way to upgrade")}</h2><ol className="trade-steps-list"><li className={step === 1 ? 'active' : ''}><span>01</span><div><strong>{t("Tell us about it")}</strong><small>{t("Model, storage and condition.")}</small></div></li><li className={step === 2 ? 'active' : ''}><span>02</span><div><strong>{t("Answer a few questions")}</strong><small>{t("It helps us estimate fairly.")}</small></div></li><li className={step === 3 ? 'active' : ''}><span>03</span><div><strong>{t("See your estimate")}</strong><small>{t("Then bring it by for a check.")}</small></div></li></ol><div className="trade-aside-note"><ShieldCheck size={18} /><p><strong>{t("Good to know")}</strong><br />{t("Your estimate is a guide. A final offer is confirmed after an in-store inspection.")}</p></div></aside>
       <section className="trade-form-card" aria-live="polite">
-        {mode === 'manual' ? <div className="manual-quote"><button type="button" className="back-link" onClick={() => { setMode('estimate'); setError(t('')) }}><ArrowLeft size={16} />{t("Back to phone details")}</button>{manualSent ? <div className="manual-success"><span className="success-icon"><Check /></span><h2>{t("Your message is ready")}</h2><p>{t("WhatsApp opened with your details. Send it to our team and we’ll get back to you with a manual quote.")}</p><button type="button" className="button button-primary" onClick={reset}>{t("Start another estimate")}</button></div> : <><span className="eyebrow">{t("We’ll take it from here")}</span><h2>{t("Let’s find out together")}</h2><p>{t("We don’t have a set value for that model yet. Share a few details and our team will personally help you.")}</p><form onSubmit={manualSubmit} className="manual-form"><label className="field-label">{t("Phone model")}<input value={otherModel} onChange={(event) => setOtherModel(event.target.value)} placeholder={t("Brand, model and storage if known")} required /></label><label className="field-label">{t("Your name")}<input value={manualName} onChange={(event) => setManualName(event.target.value)} autoComplete="name" required /></label><label className="field-label">{t("Phone, Telegram or email")}<input value={manualContact} onChange={(event) => setManualContact(event.target.value)} required placeholder={t("+251 … / @username / email")} /></label><button type="submit" className="button button-whatsapp"><MessageCircle size={17} />{t("Ask for a manual quote")}</button></form></>}</div> :
+        {mode === 'manual' ? <div className="manual-quote"><button type="button" className="back-link" onClick={() => { setMode('estimate'); setError(t('')) }}><ArrowLeft size={16} />{t("Back to phone details")}</button>{manual.status === 'saved' ? <RequestSaved text={t("Our team will contact you with a manual quote.")} whatsappUrl={manualUrl}><button type="button" className="button button-primary" onClick={reset}>{t("Start another estimate")}</button></RequestSaved> : <><span className="eyebrow">{t("We’ll take it from here")}</span><h2>{t("Let’s find out together")}</h2><p>{t("We don’t have a set value for that model yet. Share a few details and our team will personally help you.")}</p><form onSubmit={manualSubmit} className="manual-form"><label className="field-label">{t("Phone model")}<input value={otherModel} onChange={(event) => setOtherModel(event.target.value)} placeholder={t("Brand, model and storage if known")} required /></label><label className="field-label">{t("Your name")}<input value={manualName} onChange={(event) => setManualName(event.target.value)} autoComplete="name" required /></label><label className="field-label">{t("Phone, Telegram or email")}<input value={manualContact} onChange={(event) => setManualContact(event.target.value)} required placeholder={t("+251 … / @username / email")} /></label>{manual.problem && <RequestFailed problem={manual.problem} whatsappUrl={manualUrl} />}<button type="submit" className="button button-primary" disabled={manual.status === 'sending'}>{manual.status === 'sending' ? t("Sending…") : t("Ask for a manual quote")}</button></form></>}</div> :
           <>
             <div className="progress-header"><div><span className="eyebrow">{t("Your trade-in estimate")}</span><span className="step-count">{t("Step")} {step} {t("of 3")}</span></div><div className="progress-track"><span style={{ width: `${step * 33.333}%` }} /></div><div className="progress-labels"><span className={step >= 1 ? 'current' : ''}>{t("Phone")}</span><span className={step >= 2 ? 'current' : ''}>{t("Condition")}</span><span className={step >= 3 ? 'current' : ''}>{t("Estimate")}</span></div></div>
             {step === 1 && <div className="trade-step-content"><span className="step-icon"><Smartphone size={20} /></span><h2>{t("First, what are we looking at?")}</h2><p>{t("Pick your current phone to get started.")}</p><label className="field-label">{t("Brand")}<select value={brand} onChange={(event) => { setBrand(event.target.value); setModel(''); setStorage(''); setQuery('') }}><option value="">{t("Choose a brand")}</option>{brands.map((item) => <option key={item}>{item}</option>)}<option value="Other">{t("Other brand")}</option></select></label>
@@ -459,7 +461,7 @@ Contact: ${bookContact.trim()}`, shop.whatsapp[0])
             {step === 3 && estimate && <div className="trade-result"><button type="button" className="back-link" onClick={() => setStep(2)}><ArrowLeft size={15} />{t("Back to condition")}</button><div className={`estimate-hero ${!estimate.eligible ? 'estimate-ineligible' : ''}`}><span className="eyebrow">{estimate.eligible ? t("Your estimated trade-in value") : t("Trade-in status")}</span>{estimate.eligible ? <><strong>{formatPrice(estimate.estimate ?? 0)}</strong><span className="estimate-range">{formatPrice(estimate.min ?? 0)} – {formatPrice(estimate.max ?? 0)}</span><small>{t("Estimated value range")}</small></> : <><strong className="ineligible-title">{t("Not eligible yet")}</strong><span className="estimate-range">{t("Unlock this phone first")}</span><small>{t("We can only accept unlocked devices.")}</small></>}</div>
               {estimate.eligible && <><div className="estimate-breakdown"><div><strong>{t("Estimate breakdown")}</strong><span>{t("Starting value:")} {formatPrice(estimate.baseValue)}</span></div>{estimate.deductions.length ? estimate.deductions.map((deduction) => <div key={deduction.label}><span>{deduction.label}</span><span>− {formatPrice(deduction.amount)}</span></div>) : <div><span>{t("Excellent condition")}</span><span>{t("No deductions")}</span></div>}</div><p className="estimate-disclaimer">{t("Estimate only. Final value is confirmed after an in-store inspection.")}</p></>}
               {target && estimate.eligible && <div className="trade-target"><span className="eyebrow">{t("Put it toward something new")}</span><label className="field-label">{t("Choose a phone")}<select value={targetSlug} onChange={(event) => setTargetSlug(event.target.value)}>{phones.map((phone) => <option key={phone.slug} value={phone.slug}>{fullPhoneName(phone.brand, phone.model)}</option>)}</select></label><div><span>{formatPrice(targetPrice)} − {formatPrice(tradeValue)}</span><strong>≈ {formatPrice(Math.max(0, targetPrice - tradeValue))}</strong></div><small>{t("Estimated balance after trade-in. Subject to inspection.")}</small></div>}
-              {bookOpen ? <form className="trade-book" onSubmit={bookInspection}><label className="field-label">{t("Your name")}<input autoComplete="name" value={bookName} onChange={(event) => setBookName(event.target.value)} required /></label><label className="field-label">{t("Phone, Telegram or email")}<input value={bookContact} onChange={(event) => setBookContact(event.target.value)} required placeholder={t("+251 … / @username / email")} /></label><button type="submit" className="button button-whatsapp button-full"><MessageCircle size={17} />{t("Send on WhatsApp")}</button></form> : <button type="button" onClick={() => setBookOpen(true)} className="button button-whatsapp button-full"><MessageCircle size={17} />{t("Book an inspection on WhatsApp")}</button>}<button type="button" className="button button-outline button-full" onClick={() => { if (!target) setTargetSlug(phones[0]?.slug ?? '') }}><CreditCard size={17} />{target ? t("Estimated price above") : t("Use this toward a new phone")}</button><button type="button" className="text-button start-over" onClick={reset}>{t("Start over")}</button>
+              {booking.status === 'saved' ? <RequestSaved text={t("We’ll contact you to arrange your inspection.")} whatsappUrl={bookingUrl} /> : bookOpen ? <form className="trade-book" onSubmit={bookInspection}><label className="field-label">{t("Your name")}<input autoComplete="name" value={bookName} onChange={(event) => setBookName(event.target.value)} required /></label><label className="field-label">{t("Phone, Telegram or email")}<input value={bookContact} onChange={(event) => setBookContact(event.target.value)} required placeholder={t("+251 … / @username / email")} /></label>{booking.problem && <RequestFailed problem={booking.problem} whatsappUrl={bookingUrl} />}<button type="submit" className="button button-primary button-full" disabled={booking.status === 'sending'}>{booking.status === 'sending' ? t("Sending…") : t("Send my request")}</button></form> : <button type="button" onClick={() => setBookOpen(true)} className="button button-primary button-full"><CalendarCheck size={17} />{t("Book an inspection")}</button>}<button type="button" className="button button-outline button-full" onClick={() => { if (!target) setTargetSlug(phones[0]?.slug ?? '') }}><CreditCard size={17} />{target ? t("Estimated price above") : t("Use this toward a new phone")}</button><button type="button" className="text-button start-over" onClick={reset}>{t("Start over")}</button>
             </div>}
           </>}
       </section>
@@ -504,31 +506,17 @@ function Contact() {
   const [name, setName] = useState('')
   const [contact, setContact] = useState('')
   const [message, setMessage] = useState('')
-  const [leadError, setLeadError] = useState('')
-  const [leadNotice, setLeadNotice] = useState('')
+  const lead = useLeadForm()
+  const whatsappUrl = createWhatsAppUrl(`Hello ${shop.name}, I’m ${name.trim()}.\n${message.trim()}`, shop.whatsapp[0])
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const text = `Hello ${shop.name}, I’m ${name.trim()}.\n${message.trim()}`
-    const url = createWhatsAppUrl(text, shop.whatsapp[0])
-    const popup = window.open(url, '_blank', 'noopener,noreferrer')
-    setLeadError('')
-    setLeadNotice('Your message is ready in WhatsApp.')
-    void fetch('/api/leads', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ type: 'contact', name: name.trim(), contact: contact.trim(), payload: { message: message.trim() } }),
-    }).then(async (response) => {
-      if (!response.ok) {
-        const result = await response.json().catch(() => ({}))
-        setLeadError(result.error ?? 'The WhatsApp message is ready, but the request was not saved to the shop inbox.')
-      } else setLeadNotice('Thanks — your request was saved. Send the prepared WhatsApp message to reach our team directly.')
-    }).catch(() => setLeadError('The WhatsApp message is ready, but the request could not be saved to the shop inbox.'))
-    if (!popup) window.location.assign(url)
+    void lead.send({ type: 'contact', name: name.trim(), contact: contact.trim(), payload: { message: message.trim() } })
   }
   return <div className="container page-container contact-page">
     <div className="page-intro"><div><span className="eyebrow">{t("A real person, a real answer")}</span><h1>{t("Say hello")}</h1><p>{t("Questions about a phone, a trade-in, or the best way to find us? We’re just a message away.")}</p></div><div className="contact-open-badge"><span /> {t("Open today")} <small>{shop.hours}</small></div></div>
     <div className="contact-layout"><div className="contact-methods"><a className="contact-method" href={`tel:${shop.phones[0]}`}><span className="contact-method-icon"><PhoneCall /></span><span><small>{t("Call the shop")}</small><strong>{shop.phones[0]}</strong>{shop.phones[1] && <em>{t("Or")} {shop.phones[1]}</em>}</span><ArrowUpRight /></a><a className="contact-method" href={createWhatsAppUrl(`Hello ${shop.name}, I have a question.`, shop.whatsapp[0])} target="_blank" rel="noreferrer"><span className="contact-method-icon whatsapp-contact"><MessageCircle /></span><span><small>{t("WhatsApp")}</small><strong>{t("Chat with our team")}</strong><em>{t("Quick, friendly help")}</em></span><ArrowUpRight /></a><a className="contact-method" href={shop.telegram} target="_blank" rel="noreferrer"><span className="contact-method-icon"><SendIcon /></span><span><small>{t("Telegram")}</small><strong>{t("@Siaabmobiles")}</strong><em>{t("Find us on Telegram")}</em></span><ArrowUpRight /></a><a className="contact-method" href={`mailto:${shop.email}`}><span className="contact-method-icon"><MailIcon /></span><span><small>{t("Email")}</small><strong>{shop.email}</strong><em>{t("We’ll get back to you")}</em></span><ArrowUpRight /></a>
       <div className="address-card"><span className="eyebrow">{t("Come find us")}</span><h2>{t("Megenagna, Addis Ababa")}</h2><p>{shop.address}</p><p><Clock3 size={16} />{shop.hours}</p><a href={shop.mapUrl} target="_blank" rel="noreferrer" className="button button-primary">{t("View on map")} <ArrowUpRight size={16} /></a></div>
-    </div><section className="contact-form-card"><span className="eyebrow">{t("A note to our team")}</span><h2>{t("What’s on your mind?")}</h2><p>{t("Write us a note and WhatsApp will open with your message ready to send.")}</p><form onSubmit={submit}><label className="field-label">{t("Your name")}<input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" required /></label><label className="field-label">{t("Phone, Telegram or email")}<input value={contact} onChange={(event) => setContact(event.target.value)} required placeholder={t("+251 … / @username / email")} /></label><label className="field-label">{t("How can we help?")}<textarea rows={5} value={message} onChange={(event) => setMessage(event.target.value)} required placeholder={t("I’m looking for…")} /></label>{leadError && <p className="form-error" role="alert">{leadError}</p>}{leadNotice && <p className="form-success" role="status">{leadNotice}</p>}<button type="submit" className="button button-whatsapp button-full"><MessageCircle size={17} />{t("Continue in WhatsApp")}</button><small>{t("This opens a message to our WhatsApp number. Nothing is sent until you choose to send it.")}</small></form></section></div>
+    </div><section className="contact-form-card"><span className="eyebrow">{t("A note to our team")}</span><h2>{t("What’s on your mind?")}</h2>{lead.status === 'saved' ? <RequestSaved text={t("Thanks. We got your message and will get back to you.")} whatsappUrl={whatsappUrl} /> : <><p>{t("Write us a note and our team will get back to you.")}</p><form onSubmit={submit}><label className="field-label">{t("Your name")}<input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" required /></label><label className="field-label">{t("Phone, Telegram or email")}<input value={contact} onChange={(event) => setContact(event.target.value)} required placeholder={t("+251 … / @username / email")} /></label><label className="field-label">{t("How can we help?")}<textarea rows={5} value={message} onChange={(event) => setMessage(event.target.value)} required placeholder={t("I’m looking for…")} /></label>{lead.problem && <RequestFailed problem={lead.problem} whatsappUrl={whatsappUrl} />}<button type="submit" className="button button-primary button-full" disabled={lead.status === 'sending'}>{lead.status === 'sending' ? t("Sending…") : t("Send message")}</button><small>{t("We reply by phone, Telegram or email, whichever you leave above.")}</small></form></>}</section></div>
   </div>
 }
 

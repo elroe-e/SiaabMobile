@@ -121,6 +121,40 @@ describe('catalog and WhatsApp helpers', () => {
   })
 })
 
+describe('request forms', () => {
+  const sendManualQuote = () => {
+    render(<TradeIn />)
+    fireEvent.change(screen.getAllByRole('combobox')[0]!, { target: { value: 'Other' } })
+    fireEvent.click(screen.getByRole('button', { name: /continue/i }))
+    fireEvent.change(screen.getByLabelText('Phone model'), { target: { value: 'Tecno Spark 20' } })
+    fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Abel' } })
+    fireEvent.change(screen.getByLabelText('Phone, Telegram or email'), { target: { value: '+251911000000' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Ask for a manual quote' }))
+  }
+
+  it('saves the request and confirms it without opening WhatsApp', async () => {
+    const save = vi.fn(async (_url: string, _init: { body: string }) => ({ ok: true, json: async () => ({ id: '1' }) }))
+    vi.stubGlobal('fetch', save)
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+    sendManualQuote()
+    expect(await screen.findByText('Request received')).toBeInTheDocument()
+    expect(JSON.parse(save.mock.calls[0]![1].body)).toMatchObject({ type: 'trade_in', name: 'Abel', contact: '+251911000000', payload: { model: 'Other Tecno Spark 20' } })
+    expect(open).not.toHaveBeenCalled()
+    expect(screen.getByRole('link', { name: 'Send it on WhatsApp too' })).toHaveAttribute('href', expect.stringContaining('https://wa.me/251923641747'))
+    vi.unstubAllGlobals()
+  })
+
+  it('keeps the form filled and offers a phone call when the request cannot be saved', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, json: async () => ({ error: 'We could not save your request.' }) })))
+    sendManualQuote()
+    expect(await screen.findByRole('alert')).toHaveTextContent('We could not save your request.')
+    expect(screen.getByRole('link', { name: 'Call the shop' })).toHaveAttribute('href', 'tel:+251923641747')
+    expect(screen.getByLabelText('Your name')).toHaveValue('Abel')
+    expect(screen.queryByText('Request received')).not.toBeInTheDocument()
+    vi.unstubAllGlobals()
+  })
+})
+
 describe('phone display names', () => {
   it('does not repeat the brand when the model already includes it', async () => {
     const { fullPhoneName } = await import('../lib/format')
