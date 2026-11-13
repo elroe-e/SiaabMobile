@@ -19,11 +19,12 @@ export async function generateMetadata({ params }: { params: Promise<{ slug?: st
     let catalog = phones
     try { catalog = await getPublicCatalog() } catch (error) { console.error('Could not load dynamic metadata from the shop database.', error) }
     const phone = catalog.find((item) => item.slug === slug[1])
+    // A phone without a photo carries inline SVG art, which chat apps cannot draw, so it shares the shop picture.
     if (phone) return {
       title: `${fullPhoneName(phone.brand, phone.model)}`,
       alternates,
       description: `${fullPhoneName(phone.brand, phone.model)}: stock, ETB price, storage options, warranty and full specifications at Siaab Mobile.`,
-      openGraph: { title: `${fullPhoneName(phone.brand, phone.model)} | Siaab Mobile`, description: `${fullPhoneName(phone.brand, phone.model)} at Siaab Mobile.`, images: [phone.images[0] ?? '/og-image.svg'] },
+      openGraph: { title: `${fullPhoneName(phone.brand, phone.model)} | Siaab Mobile`, description: `${fullPhoneName(phone.brand, phone.model)} at Siaab Mobile.`, images: [phone.images.find((image) => !image.startsWith('data:')) ?? '/og-image.png'] },
     }
   }
   const titles: Record<string, string> = {

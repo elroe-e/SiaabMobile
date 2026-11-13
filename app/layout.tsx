@@ -17,7 +17,8 @@ export const metadata: Metadata = {
     title: 'Siaab Mobile — Find your next phone',
     description: 'Thoughtful phone shopping, trusted warranties and easy in-store trade-ins.',
     type: 'website',
-    images: ['/og-image.svg'],
+    // PNG, because WhatsApp, Telegram and Facebook do not draw SVG previews.
+    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'Siaab Mobile: find your next phone in Addis Ababa' }],
   },
   twitter: { card: 'summary_large_image' },
   applicationName: 'SiaabMobile',
