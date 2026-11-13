@@ -8,8 +8,9 @@ import { placeholderImages } from '../../data/phones'
 import { tradeInConfig as sampleTradeConfig } from '../tradeIn'
 import type { StoreData } from '../../context/StoreDataContext'
 import type { TradeInConfig } from '../tradeIn'
-import type { UpcomingPhone } from '../../types'
+import type { Phone, UpcomingPhone } from '../../types'
 import { isDatabaseConfigured } from './pool'
+import { getPublicCatalog } from './public-catalog'
 
 type DbModel = { id: string; brand: string; name: string; slug: string; expected_date: string | null; expected_price_range: string | null; tagline: string; specs: Record<string, unknown> }
 type DbPhoto = { model_id: string; path: string; sort_order: number; is_main: boolean }
@@ -90,5 +91,19 @@ export async function getPublicStoreData(): Promise<StoreData> {
     })),
     tradeInConfig: (configResult.data?.config ?? sampleTradeConfig) as TradeInConfig,
     upcomingPhones: upcoming,
+  }
+}
+
+/**
+ * Loads what every shop page shows. If the database cannot be reached the shop still opens with its
+ * contact details and standard trade-in list, but with no phones: never the demo catalogue and its made-up prices.
+ */
+export async function loadStorefront(): Promise<{ catalog: Phone[]; storeData: StoreData; offline: boolean }> {
+  try {
+    const [catalog, storeData] = await Promise.all([getPublicCatalog(), getPublicStoreData()])
+    return { catalog, storeData, offline: false }
+  } catch (error) {
+    console.error('Shop database unavailable; showing the shop without its phone list.', error)
+    return { catalog: [], storeData: { shop: sampleShop, tradeInValues: sampleTradeValues, tradeInConfig: sampleTradeConfig, upcomingPhones: [] }, offline: true }
   }
 }

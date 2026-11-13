@@ -81,6 +81,8 @@ p { color: var(--muted); line-height: 1.72; }
 .field-label input:focus, .field-label select:focus, .field-label textarea:focus, .advanced-spec-toolbar input:focus { border-color: #7ca4f9; box-shadow: 0 0 0 3px rgba(21,94,239,.11); }
 .field-label input::placeholder, .field-label textarea::placeholder { color: #9aa4b3; }
 .form-error { padding: 10px 12px; border-radius: 7px; background: var(--red-pale); color: var(--red); font-size: 12px; line-height: 1.5; }
+.offline-notice { margin: 0; padding: 10px 16px; background: #fff7e9; color: #8a621e; font-size: 13px; line-height: 1.5; text-align: center; }
+.offline-notice a { color: inherit; font-weight: 700; text-decoration: underline; }
 .site-header { position: sticky; z-index: 30; top: 0; height: 76px; background: rgba(247,248,250,.93); border-bottom: 1px solid rgba(228,232,239,.78); backdrop-filter: blur(18px); }
 .header-inner { width: min(1320px, calc(100% - 64px)); height: 100%; margin: auto; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .brand-lockup { display: inline-flex; align-items: center; gap: 10px; flex: 0 0 auto; }

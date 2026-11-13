@@ -5,10 +5,9 @@ import { fullPhoneName } from '../../src/lib/format'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import App from '../../src/App'
-import { phones } from '../../src/data/phones'
 import { getPublicCatalog } from '../../src/lib/db/public-catalog'
-import { getPublicStoreData } from '../../src/lib/db/public-store'
-import type { StoreData } from '../../src/context/StoreDataContext'
+import { loadStorefront } from '../../src/lib/db/public-store'
+import type { Phone } from '../../src/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +15,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug?: st
   const { slug = [] } = await params
   const alternates = { canonical: `/${slug.join('/')}` }
   if (slug[0] === 'phones' && slug[1]) {
-    let catalog = phones
+    let catalog: Phone[] = []
     try { catalog = await getPublicCatalog() } catch (error) { console.error('Could not load dynamic metadata from the shop database.', error) }
     const phone = catalog.find((item) => item.slug === slug[1])
     // A phone without a photo carries inline SVG art, which chat apps cannot draw, so it shares the shop picture.
@@ -48,15 +47,9 @@ const knownPages = new Set(['', 'phones', 'upcoming', 'trade-in', 'about', 'cont
 export default async function StorefrontPage({ params }: { params: Promise<{ slug?: string[] }> }) {
   const { slug = [] } = await params
   const initialLang = parseLanguage((await cookies()).get(LANGUAGE_COOKIE)?.value)
-  let catalog = phones
-  let storeData: StoreData | null = null
-  try {
-    [catalog, storeData] = await Promise.all([getPublicCatalog(), getPublicStoreData()])
-  } catch (error) {
-    console.error('Shop database unavailable; rendering editable sample data.', error)
-  }
+  const { catalog, storeData, offline } = await loadStorefront()
   const path = slug.join('/')
   const isPhonePage = slug[0] === 'phones' && slug.length === 2 && catalog.some((item) => item.slug === slug[1])
   if (!knownPages.has(path) && !isPhonePage) notFound()
-  return <Suspense fallback={<LoadingStorefront />}><App initialPhones={catalog} initialLang={initialLang} {...(storeData ? { initialStoreData: storeData } : {})} /></Suspense>
+  return <Suspense fallback={<LoadingStorefront />}><App initialPhones={catalog} initialLang={initialLang} initialStoreData={storeData} offline={offline} /></Suspense>
 }

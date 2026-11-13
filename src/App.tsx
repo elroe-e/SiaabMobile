@@ -29,11 +29,12 @@ import type { Language } from './i18n/language'
 const PhoneContext = createContext<Phone[]>(phones)
 const usePhoneData = () => useContext(PhoneContext)
 
-function App({ initialPhones = phones, initialStoreData = defaultStoreData, initialLang = 'en' }: { initialPhones?: Phone[]; initialStoreData?: StoreData; initialLang?: Language }) {
-  return <LanguageProvider initialLang={initialLang}><StoreDataProvider value={initialStoreData}><StorefrontApp initialPhones={initialPhones} /></StoreDataProvider></LanguageProvider>
+function App({ initialPhones = phones, initialStoreData = defaultStoreData, initialLang = 'en', offline = false }: { initialPhones?: Phone[]; initialStoreData?: StoreData; initialLang?: Language; offline?: boolean }) {
+  return <LanguageProvider initialLang={initialLang}><StoreDataProvider value={initialStoreData}><StorefrontApp initialPhones={initialPhones} offline={offline} /></StoreDataProvider></LanguageProvider>
 }
 
-function StorefrontApp({ initialPhones }: { initialPhones: Phone[] }) {
+function StorefrontApp({ initialPhones, offline }: { initialPhones: Phone[]; offline: boolean }) {
+  const t = useT()
   const phoneData = initialPhones
   const { shop } = useStoreData()
   const pathname = usePathname()
@@ -73,7 +74,7 @@ function StorefrontApp({ initialPhones }: { initialPhones: Phone[] }) {
               : pathname === '/contact' ? <Contact />
                 : pathname === '/brands' ? <Brands />
                 : <NotFound />
-  return <PhoneContext.Provider value={phoneData}><Header /><main id="main-content">{page}</main><Footer /><FloatingCall /></PhoneContext.Provider>
+  return <PhoneContext.Provider value={phoneData}><Header />{offline && <p className="offline-notice" role="status">{t("We can’t show our phones right now. Please call the shop on")} <a href={telLink(shop.phones[0] ?? '')}>{shop.phones[0]}</a></p>}<main id="main-content">{page}</main><Footer /><FloatingCall /></PhoneContext.Provider>
 }
 
 function Home() {
