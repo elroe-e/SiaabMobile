@@ -11,7 +11,7 @@ import {
 import { phones, placeholderImages } from './data/phones'
 import { defaultFilters, filterPhones, type CatalogFilters } from './lib/filters'
 import { estimateTradeIn } from './lib/tradeIn'
-import { formatPrice, formatStorage, fullPhoneName } from './lib/format'
+import { formatPrice, formatStorage, fullPhoneName, openingHoursForSearch } from './lib/format'
 import { createWhatsAppUrl, phoneOrderMessage, tradeInMessage } from './lib/whatsapp'
 import { visibleColors } from './lib/colors'
 import { brandLogo, brandSummary } from './lib/brandLogos'
@@ -85,7 +85,7 @@ function Home() {
   const brands = [...new Set(phones.map((phone) => phone.brand))]
   const [faq, setFaq] = useState<number | null>(0)
   const [mode, setMode] = useSpecMode()
-  const localBusinessSchema = { '@context': 'https://schema.org', '@type': ['LocalBusiness', 'Store'], name: shop.name, description: shop.tagline, telephone: shop.phones[0], email: shop.email, address: { '@type': 'PostalAddress', streetAddress: shop.address, addressLocality: 'Addis Ababa', addressCountry: 'ET' }, openingHours: shop.hours, url: shop.siteUrl }
+  const localBusinessSchema = { '@context': 'https://schema.org', '@type': ['LocalBusiness', 'Store'], name: shop.name, description: shop.tagline, telephone: shop.phones[0], email: shop.email, address: { '@type': 'PostalAddress', streetAddress: shop.address, addressLocality: 'Addis Ababa', addressCountry: 'ET' }, openingHours: openingHoursForSearch(shop.hours), url: shop.siteUrl }
   return <div className="home-page">
     <script type="application/ld+json">{JSON.stringify(localBusinessSchema)}</script>
     <section className="hero-section container">

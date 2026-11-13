@@ -155,6 +155,18 @@ describe('request forms', () => {
   })
 })
 
+describe('opening hours for search engines', () => {
+  it('rewrites the shop hours in the standard form and leaves out anything written another way', async () => {
+    const { openingHoursForSearch } = await import('../lib/format')
+    expect(openingHoursForSearch('Monday–Saturday, 9:00 AM–7:00 PM')).toBe('Mo-Sa 09:00-19:00')
+    expect(openingHoursForSearch('monday - sunday 12 am - 12 pm')).toBe('Mo-Su 00:00-12:00')
+    expect(openingHoursForSearch('Tuesday-Friday, 8:30am-12:15pm')).toBe('Tu-Fr 08:30-12:15')
+    expect(openingHoursForSearch('Open every day, call first')).toBeUndefined()
+    expect(openingHoursForSearch('Monday–Saturday, 13:00 PM–7:00 PM')).toBeUndefined()
+    expect(openingHoursForSearch('Funday–Saturday, 9:00 AM–7:00 PM')).toBeUndefined()
+  })
+})
+
 describe('phone display names', () => {
   it('does not repeat the brand when the model already includes it', async () => {
     const { fullPhoneName } = await import('../lib/format')

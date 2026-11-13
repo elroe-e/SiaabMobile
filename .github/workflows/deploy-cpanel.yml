@@ -42,7 +42,8 @@ jobs:
           NEXT_PUBLIC_SITE_URL: ${{ vars.SITE_URL || 'https://siaabmobile.com' }}
         run: |
           npm ci
-          node scripts/package-cpanel.mjs --no-zip
+          # The build downloads the fonts from Google, which fails now and then; one retry gets past it.
+          node scripts/package-cpanel.mjs --no-zip || node scripts/package-cpanel.mjs --no-zip
           tar -czf site.tar.gz -C .next/standalone .
 
       - name: Upload and switch over
