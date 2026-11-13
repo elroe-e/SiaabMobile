@@ -473,6 +473,7 @@ p { color: var(--muted); line-height: 1.72; }
 .request-saved h2 { margin: 0; }
 .request-saved p { max-width: 360px; margin: 0 0 9px; font-size: 13px; }
 .request-saved .success-icon { margin-bottom: 6px; }
+.request-saved .button { align-self: stretch; text-wrap: balance; }
 .contact-open-badge { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 9px; background: var(--white); color: var(--green); font-size: 11px; font-weight: 700; }
 .contact-open-badge > span { width: 7px; height: 7px; margin-right: 5px; border-radius: 50%; background: #48a879; box-shadow: 0 0 0 4px #e6f5ec; }
 .contact-open-badge small { color: var(--muted); font-size: 11px; font-weight: 400; }
