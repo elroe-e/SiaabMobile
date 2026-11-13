@@ -204,6 +204,8 @@ export const amharic: Record<string, string> = {
   "· Expected": "· የሚጠበቀው",
   "Expected price range": "የሚጠበቅ የዋጋ ክልል",
   "Let me know when it’s here": "ሲመጣ ያሳውቁኝ",
+  "Nothing announced yet": "እስካሁን የተገለጸ ነገር የለም",
+  "New arrivals appear here first. Check back soon, or ask the shop what’s on the way.": "አዳዲስ ስልኮች መጀመሪያ እዚህ ይታያሉ። በቅርቡ ተመልሰው ይመልከቱ፤ ወይም ምን እየመጣ እንደሆነ ሱቁን ይጠይቁ።",
   "A note about upcoming phones": "ስለሚመጡ ስልኮች ማስታወሻ",
   "Dates, prices and specifications are indicative only and can change. Availability and details are not confirmed until the shop verifies local stock.": "ቀኖች፣ ዋጋዎችና ዝርዝሮች ግምታዊ ብቻ ናቸው፤ ሊቀየሩ ይችላሉ። ሱቁ የአካባቢውን ክምችት እስኪያረጋግጥ ድረስ መኖርና ዝርዝሮች አልተረጋገጡም።",
   "Close dialog": "መስኮቱን ዝጋ",
