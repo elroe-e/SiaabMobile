@@ -4,9 +4,9 @@ import { estimateTradeIn } from '../lib/tradeIn'
 import { createWhatsAppUrl } from '../lib/whatsapp'
 import { phones } from '../data/phones'
 import type { TradeInAnswers } from '../types'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, renderHook, screen } from '@testing-library/react'
 import { SpecSwitcher } from '../components/Storefront'
-import { TradeIn } from '../App'
+import { TradeIn, useLeadForm } from '../App'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('next/navigation', () => ({
@@ -151,6 +151,24 @@ describe('request forms', () => {
     expect(screen.getByRole('link', { name: 'Call the shop' })).toHaveAttribute('href', 'tel:+251923641747')
     expect(screen.getByLabelText('Your name')).toHaveValue('Abel')
     expect(screen.queryByText('Request received')).not.toBeInTheDocument()
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('a request form that is closed while it is still sending', () => {
+  it('does not show the old result when the form is opened again', async () => {
+    let finish: (response: { ok: boolean; json: () => Promise<object> }) => void = () => undefined
+    vi.stubGlobal('fetch', vi.fn(() => new Promise((resolve) => { finish = resolve })))
+    const { result } = renderHook(() => useLeadForm())
+    act(() => { void result.current.send({ type: 'notify_me', name: 'Abel', contact: '+251911000000', payload: {} }) })
+    expect(result.current.status).toBe('sending')
+    act(() => result.current.reset())
+    await act(async () => { finish({ ok: true, json: async () => ({}) }) })
+    expect(result.current.status).toBe('idle')
+    // A form that was not reset still confirms.
+    act(() => { void result.current.send({ type: 'notify_me', name: 'Abel', contact: '+251911000000', payload: {} }) })
+    await act(async () => { finish({ ok: true, json: async () => ({}) }) })
+    expect(result.current.status).toBe('saved')
     vi.unstubAllGlobals()
   })
 })

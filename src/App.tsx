@@ -255,20 +255,24 @@ type LeadRequest = { type: 'trade_in' | 'notify_me' | 'contact'; name: string; c
 const saveFailed = 'We could not save your request.'
 
 /** One request form's progress. The saved request is how the shop hears about it, so a form only confirms once the save succeeded. */
-function useLeadForm() {
+export function useLeadForm() {
   const [status, setStatus] = useState<'idle' | 'sending' | 'saved'>('idle')
   const [problem, setProblem] = useState('')
+  // Counts resets, so a save that finishes after its form was closed or restarted does not show its result on the next one.
+  const resets = useRef(0)
   const send = async (lead: LeadRequest) => {
     if (status === 'sending') return
+    const started = resets.current
     setStatus('sending')
     setProblem('')
     const reason = await fetch('/api/leads', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(lead) })
       .then(async (response) => response.ok ? '' : ((await response.json().catch(() => ({}))) as { error?: string }).error ?? saveFailed)
       .catch(() => saveFailed)
+    if (resets.current !== started) return
     setProblem(reason)
     setStatus(reason ? 'idle' : 'saved')
   }
-  const reset = () => { setStatus('idle'); setProblem('') }
+  const reset = () => { resets.current += 1; setStatus('idle'); setProblem('') }
   return { status, problem, send, reset }
 }
 
