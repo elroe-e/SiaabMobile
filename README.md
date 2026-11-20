@@ -112,8 +112,8 @@ All sample prices, stock, warranties, device details, trade-in values, upcoming 
 
 Admin → Inventory → **Add inventory** opens a two-step form.
 
-1. **Phone details:** type, brand (pick from the list with the arrow on the left, or type: the first letters suggest a match, Enter or a tap takes it, and any other brand can still be typed), model, colour(s), RAM, storage, battery (optional), price, quantity and photos. The colour, RAM, storage and battery typed here always win: the automatic lookup (Gemini, Wikipedia, saved library) never replaces them, and they are marked as set by hand so later lookups leave them alone. Leave battery empty to let the lookup suggest it. For several colours write them with commas (for example `Black, Blue`); each colour gets its own stock line with the same quantity. Customers see the colours but cannot choose one. If the model already exists, the form adds the new colour or storage to it instead of creating a duplicate.
-2. **Specifications:** the app looks up the remaining specifications automatically (saved library, Wikipedia, then the optional Google AI source). Review the list, tick **These specifications look right** and the phone is published. Without that tick it is saved as a draft and stays hidden. If nothing is found you can paste specifications copied from any website, or save and customers see "Not specified".
+1. **Phone details:** type, brand (pick from the list with the arrow on the left, or type: the first letters suggest a match, Enter or a tap takes it, and any other brand can still be typed), model (after choosing a brand, typing suggests that brand's phones from the spec library; Enter or a tap takes one, and any other name can still be typed), colour(s), RAM, storage, battery (optional), price, quantity and photos. The colour, RAM, storage and battery typed here always win: the automatic lookup (Gemini, Wikipedia, saved library) never replaces them, and they are marked as set by hand so later lookups leave them alone. Leave battery empty to let the lookup suggest it. For several colours write them with commas (for example `Black, Blue`); each colour gets its own stock line with the same quantity. Customers see the colours but cannot choose one. If the model already exists, the form adds the new colour or storage to it instead of creating a duplicate.
+2. **Specifications:** the app looks up the remaining specifications automatically (saved library, Wikipedia, then the optional Google AI source) and puts them in labelled boxes (screen size, resolution, refresh rate, chipset, cameras, charging, 5G, weight and so on). Check the boxes, type in anything missing or wrong, tick **These specifications look right** and the phone is published. Without that tick it is saved as a draft and stays hidden. **Paste specifications from a website** is optional: paste text copied from any site and press **Fill the boxes from pasted text**; the colour, RAM, storage and battery from step 1 still win. Empty boxes show as "Not specified" to customers.
 
 Photos chosen in step 1 are shrunk to WebP (under 200 KB) and uploaded as soon as the phone is saved. The first photo is the main one.
 
@@ -127,6 +127,18 @@ The pencil (Edit) button on any inventory row opens everything that was entered 
 - A phone can only be published once **These specifications look right** is ticked. After that the specifications stay confirmed (un-confirming would hide every colour of the phone); to take a phone off the shop, untick **Publish**.
 - Only boxes you change are checked and saved; everything else stays exactly as it was stored.
 
+### Free spec library (Wikipedia)
+
+The saved library holds about 615 phones from 2018 on for Apple, Honor, Huawei, OnePlus, OPPO, realme, Samsung, vivo and Xiaomi (with Redmi, Poco and iQOO), built from Wikipedia. It is free and needs no key. It is the first place the lookup checks, and it feeds the Model suggestions.
+
+To update it (for example every few months), run on your computer, then commit and deploy as usual:
+
+```bash
+npm run specs:library
+```
+
+It downloads the phone pages again (about two minutes), rebuilds `src/data/spec-library.generated.json` and `src/data/spec-models.json`, and prints how many phones each brand has and which well-known phones are still missing. Limits: Wikipedia has no page for many budget, regional and very new phones (OnePlus 15, for example, has none), and some pages leave out values such as refresh rate. Every library value is a suggestion that still needs the review tick. The hand-checked phones in `src/data/spec-library.json` always come first.
+
 ### Free spec lookup for brand-new phones
 
 Wikipedia rarely has articles for phones released in the last year, so for new models the optional Google AI source does most of the work. It uses Google's free Gemini API:
@@ -135,7 +147,7 @@ Wikipedia rarely has articles for phones released in the last year, so for new m
 2. Add it to the host's environment variables as `GEMINI_API_KEY` (cPanel: Setup Node.js App → the app → **Environment variables**), then redeploy. Never put the key in the repository or in chat.
 3. The app picks Google's newest stable Flash model on its own (it starts with `gemini-flash-latest` and, if Google has retired a name, asks which models your key can use). Set `GEMINI_MODEL` only to force a specific model.
 
-Free-tier limits apply; when Google answers "busy", wait a minute or paste the specifications instead. AI-found specifications are suggestions: always check them before ticking the confirmation box.
+Free-tier limits apply; when Google answers "busy", wait a minute or paste the specifications instead. If Google says the free web-search limit is reached, the app asks without web search for the next hour, then tries web search again. AI-found specifications are suggestions: always check them before ticking the confirmation box.
 
 ## Two-factor sign-in (optional)
 

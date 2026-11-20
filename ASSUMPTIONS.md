@@ -16,7 +16,7 @@
 - Adding a phone still needs a price and a quantity in addition to brand, model, colour, RAM and storage, because the storefront cannot list or sell a phone without them.
 - Colours are display-only for customers. The swatch dot on the storefront is guessed from the colour name the owner types.
 - Each phone model shows as one card on the shop. Its price is the lowest variant price and its stock count is the total across colours and storage options.
-- Automatic spec lookup can only be as good as its free sources. Wikipedia and the saved library cover older phones; recent phones need the optional `GEMINI_API_KEY` or pasted specifications. Specifications are never published until the owner ticks the confirmation.
+- Automatic spec lookup can only be as good as its free sources. The saved library (about 615 phones from 2018 on, built from Wikipedia with `npm run specs:library`) and live Wikipedia cover phones that have a Wikipedia page; recent phones need the optional `GEMINI_API_KEY` or pasted specifications. Specifications are never published until the owner ticks the confirmation.
 - The backup reminder is stored per browser (localStorage); it cannot know about backups taken on another device.
 - Two-factor sign-in uses standard authenticator codes (RFC 6238, 30-second steps, one step of clock drift allowed) and is off until a person enables it. Turning it off needs a current code; the owner can also reset it from the server with `node set-owner.mjs --remove-two-factor`.
 - Forgotten passwords are reset by the owner (sellers, in Settings) or from the server Terminal (the owner). There is no email reset.

@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { splitColors } from '../../../src/lib/colors'
 import { modelSlug } from '../../../src/lib/format'
-import { BrandPicker, canonicalBrand } from './brand-picker'
+import { parsePastedSpecs } from '../../../src/lib/specs/paste-parser'
+import { BrandPicker, canonicalBrand, ModelPicker } from './brand-picker'
 import { isPhotoFile, preparePhoto, uploadPhoto } from './photo-tools'
+import { editedMeta, formToSpecs, SpecFields, specsToForm, type SpecForm } from './spec-fields'
 
 type Role = 'owner' | 'staff'
 type Kind = 'new' | 'used' | 'upcoming'
@@ -14,29 +16,6 @@ type CreateResult = { modelId?: string; unitId?: string }
 
 const providerLabel: Record<string, string> = { database: 'Saved library', wikipedia: 'Wikipedia', ai: 'Google AI', pasted: 'Pasted text' }
 const MAX_PHOTOS = 8
-
-const text = (value: unknown) => typeof value === 'string' && value ? value : null
-const num = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : null
-
-/** Turns the stored specification object into short, readable rows for the owner to check. */
-export function specRows(specs: Specs): [string, string][] {
-  const rows: [string, string | null][] = []
-  const display = (typeof specs.display === 'object' && specs.display ? specs.display : {}) as Record<string, unknown>
-  rows.push(['Display', [num(display.sizeInches) ? `${num(display.sizeInches)}″` : null, text(display.type), num(display.refreshRateHz) ? `${num(display.refreshRateHz)} Hz` : null].filter(Boolean).join(' · ') || null])
-  rows.push(['Chipset', text(specs.chipset)])
-  rows.push(['Rear camera', Array.isArray(specs.rearCamera) ? specs.rearCamera.map((item) => (item && typeof item === 'object' && 'megapixels' in item && item.megapixels ? `${String(item.megapixels)} MP` : '')).filter(Boolean).join(' + ') || null : null])
-  const front = (typeof specs.frontCamera === 'object' && specs.frontCamera ? specs.frontCamera : {}) as Record<string, unknown>
-  rows.push(['Front camera', num(front.megapixels) ? `${num(front.megapixels)} MP` : null])
-  rows.push(['Battery', [num(specs.batteryMah) ? `${num(specs.batteryMah)} mAh` : null, num(specs.chargingWatts) ? `${num(specs.chargingWatts)} W charging` : null].filter(Boolean).join(' · ') || null])
-  rows.push(['RAM', num(specs.ramGb) ? `${num(specs.ramGb)} GB` : null])
-  rows.push(['Storage', num(specs.storageGb) ? `${num(specs.storageGb)} GB` : null])
-  rows.push(['5G', typeof specs.fiveG === 'boolean' ? (specs.fiveG ? 'Yes' : 'No') : null])
-  rows.push(['NFC', typeof specs.nfc === 'boolean' ? (specs.nfc ? 'Yes' : 'No') : null])
-  rows.push(['Operating system', text(specs.os)])
-  rows.push(['Weight', num(specs.weightGrams) ? `${num(specs.weightGrams)} g` : null])
-  rows.push(['Water resistance', text(specs.waterRating)])
-  return rows.filter((row): row is [string, string] => row[1] !== null)
-}
 
 export function CreateInventoryModal({ role, onClose, onCreate, onFinished }: {
   role: Role
@@ -67,7 +46,7 @@ export function CreateInventoryModal({ role, onClose, onCreate, onFinished }: {
   const [lookupBusy, setLookupBusy] = useState(false)
   const [lookupError, setLookupError] = useState('')
   const [pastedText, setPastedText] = useState('')
-  const [jsonText, setJsonText] = useState('{}')
+  const [form, setForm] = useState<SpecForm>(() => specsToForm({}))
   const [reviewed, setReviewed] = useState(false)
   const [publish, setPublish] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -89,19 +68,32 @@ export function CreateInventoryModal({ role, onClose, onCreate, onFinished }: {
     return { ...meta, ...Object.fromEntries(Object.keys(entered()).map((key) => [key, { source: 'manual', status: 'edited', locked: true, updatedAt }])) }
   }
 
-  const lookup = async (withPasted = false) => {
+  /** Shows these specifications in the boxes; they also become the starting point for spotting hand edits. */
+  const showSpecs = (next: Specs) => { setSpecs(next); setForm(specsToForm(next)) }
+
+  /** What the person typed or pasted in step 2. A new search (Search again, or Back then Next) keeps it and only fills the rest. */
+  const ownValues = () => {
+    const typed = formToSpecs(form, specs)
+    const current = 'error' in typed ? specs : typed.specs
+    const handEdited = 'error' in typed ? {} : editedMeta(specs, typed.specs, {})
+    const fromStep1 = ['ramGb', 'storageGb', 'batteryMah']
+    const earlier = Object.keys(specMeta).filter((key) => !fromStep1.includes(key) && ['manual', 'pasted'].includes(String((specMeta[key] as { source?: unknown } | null)?.source)))
+    const keys = [...new Set([...Object.keys(handEdited), ...earlier])].filter((key) => current[key] !== undefined)
+    return { specs: Object.fromEntries(keys.map((key) => [key, current[key]])), meta: Object.fromEntries(keys.map((key) => [key, handEdited[key] ?? specMeta[key]])), current }
+  }
+
+  const lookup = async () => {
+    const own = ownValues()
     setLookupBusy(true); setLookupError('')
     try {
-      const response = await fetch('/api/admin/specs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ brand: canonicalBrand(brand), model: model.trim(), ...(withPasted && pastedText.trim() ? { pastedText } : {}) }) })
+      const response = await fetch('/api/admin/specs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ brand: canonicalBrand(brand), model: model.trim() }) })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error ?? 'Specification lookup failed.')
-      const merged = withEntered((result.specs ?? {}) as Specs)
-      setSpecs(merged); setJsonText(JSON.stringify(merged, null, 2))
-      setSpecMeta(lockEntered((result.metadata ?? {}) as Record<string, unknown>))
+      showSpecs(withEntered({ ...((result.specs ?? {}) as Specs), ...own.specs }))
+      setSpecMeta(lockEntered({ ...((result.metadata ?? {}) as Record<string, unknown>), ...own.meta }))
       setProviders((result.providers ?? []) as ProviderInfo[])
     } catch (cause) {
-      const merged = withEntered(specs)
-      setSpecs(merged); setJsonText(JSON.stringify(merged, null, 2))
+      showSpecs(withEntered(own.current))
       setLookupError(cause instanceof Error ? cause.message : 'Specification lookup failed.')
     }
     setLookupBusy(false)
@@ -115,19 +107,33 @@ export function CreateInventoryModal({ role, onClose, onCreate, onFinished }: {
     await lookup()
   }
 
-  const applyJson = () => {
-    try { const parsed = JSON.parse(jsonText) as Specs; setSpecs(parsed); setError('') } catch { setError('The specification text is not valid JSON.') }
+  /** Fills the boxes with what the pasted text contains. Values typed in step 1 still win. */
+  const applyPaste = () => {
+    const current = formToSpecs(form, specs)
+    if ('error' in current) { setError(current.error); return }
+    const found = Object.entries(parsePastedSpecs(pastedText) as Specs).filter(([, value]) => value !== null && value !== undefined)
+    if (!found.length) { setError('Nothing was recognised in the pasted text. Lines like "Battery: 5000 mAh" or "Chipset: Snapdragon 8 Gen 3" work best.'); return }
+    const next: Specs = { ...current.specs }
+    for (const [key, value] of found) {
+      next[key] = key === 'display' && value && typeof value === 'object'
+        ? { ...(next.display && typeof next.display === 'object' ? next.display : {}), ...Object.fromEntries(Object.entries(value).filter(([, part]) => part !== null && part !== undefined)) }
+        : value
+    }
+    const updatedAt = new Date().toISOString()
+    setSpecMeta(lockEntered({ ...editedMeta(specs, current.specs, specMeta), ...Object.fromEntries(found.map(([key]) => [key, { source: 'pasted', status: 'fetched', locked: false, updatedAt }])) }))
+    showSpecs(withEntered(next)); setError('')
   }
 
   const save = async () => {
     setBusy(true); setError('')
-    let finalSpecs: Specs
-    try { finalSpecs = withEntered(JSON.parse(jsonText) as Specs) } catch { setBusy(false); setError('The specification text is not valid JSON.'); return }
+    const typed = formToSpecs(form, specs)
+    if ('error' in typed) { setBusy(false); setError(typed.error); return }
+    const finalSpecs = withEntered(typed.specs)
     const body: Record<string, unknown> = {
       kind, brand: canonicalBrand(brand), model: model.trim(), slug,
       status: kind === 'upcoming' ? 'upcoming' : 'available',
       ...(kind === 'upcoming' ? { expectedDate, expectedPriceRange } : {}),
-      specs: finalSpecs, specMeta: lockEntered(specMeta), specsReviewed: reviewed, isPublished: reviewed && publish,
+      specs: finalSpecs, specMeta: lockEntered(editedMeta(specs, typed.specs, specMeta)), specsReviewed: reviewed, isPublished: reviewed && publish,
       ...(kind === 'new' ? { variant: { ramGb: Number(ramGb), storageGb: Number(storageGb), colorName: colors.trim(), price: Number(price), stockCount: Number(stockCount), lowStockThreshold: 2 } } : {}),
       ...(kind === 'used' ? { unit: { ramGb: Number(ramGb), storageGb: Number(storageGb), colorName: colors.trim(), grade: used.grade, batteryHealthPct: Number(used.batteryHealthPct), accessories: used.accessories, warrantyMonths: Number(used.warrantyMonths), price: Number(price), ...(used.costPrice ? { costPrice: Number(used.costPrice) } : {}), ...(used.imei ? { imei: used.imei } : {}), notesInternal: used.notesInternal } } : {}),
     }
@@ -147,7 +153,8 @@ export function CreateInventoryModal({ role, onClose, onCreate, onFinished }: {
     onFinished(reviewed && publish ? `Phone saved and published${photoNote}.` : `Phone saved as a draft${photoNote}.`)
   }
 
-  const rows = specRows(specs)
+  const foundOnline = providers.some((provider) => provider.foundFields > 0)
+  const keptFromStep1 = [needsColor ? colors.trim() : '', kind !== 'upcoming' ? `${ramGb} GB RAM` : '', kind !== 'upcoming' ? `${storageGb} GB storage` : '', Number(batteryMah) > 0 ? `${batteryMah} mAh battery` : ''].filter(Boolean).join(' · ')
   const addFiles = (list: FileList | null) => {
     if (!list) return
     const picked = Array.from(list)
@@ -170,7 +177,7 @@ export function CreateInventoryModal({ role, onClose, onCreate, onFinished }: {
         <div className="admin-form-grid">
           <label className="admin-label full">Type<select value={kind} onChange={(event) => setKind(event.target.value as Kind)}><option value="new">New phone</option><option value="used">Used phone (one unit)</option><option value="upcoming">Upcoming model</option></select></label>
           <BrandPicker value={brand} onChange={setBrand} />
-          <label className="admin-label">Model<input required maxLength={120} value={model} onChange={(event) => setModel(event.target.value)} placeholder="Galaxy S25 Ultra" autoComplete="off" /></label>
+          <ModelPicker brand={brand} value={model} onChange={setModel} />
           {needsColor && <label className="admin-label full">Colour<input required maxLength={120} value={colors} onChange={(event) => setColors(event.target.value)} placeholder="Black, Blue" /><small className="admin-inline-note">Customers see these colours but cannot pick one. Separate several with commas; each gets the same quantity.</small></label>}
           {kind !== 'upcoming' && <>
             <label className="admin-label">RAM (GB)<input type="number" min="1" max="24" required value={ramGb} onChange={(event) => setRamGb(event.target.value)} /></label>
@@ -210,9 +217,8 @@ export function CreateInventoryModal({ role, onClose, onCreate, onFinished }: {
           <div className="admin-label full">
             <span>{brand} {model}</span>
             {lookupBusy && <p className="admin-inline-note" role="status">Looking up specifications online…</p>}
-            <p className="admin-inline-note">{kind === 'upcoming' ? 'Battery' : 'Colour, RAM, storage and battery'} are kept as you entered them in step 1{batteryMah ? '' : ' (battery only if you entered one)'}; the online search never changes them. Use Back to change them.</p>
-            {!lookupBusy && rows.length > 0 && <dl className="admin-spec-list">{rows.map(([name, value]) => <div key={name}><dt>{name}</dt><dd>{value}</dd></div>)}</dl>}
-            {!lookupBusy && rows.length === 0 && <p className="admin-inline-note">No specifications were found online for this phone yet. You can paste them below, or save and customers will see "Not specified".</p>}
+            {keptFromStep1 && <p className="admin-inline-note">Kept from step 1: {keptFromStep1}. The online search never changes these. Use Back to change them.</p>}
+            {!lookupBusy && <p className="admin-inline-note">{foundOnline ? 'Check the boxes below and correct anything that is wrong.' : 'Nothing was found online for this phone. Fill in what you know below, or paste specifications from a website. Empty boxes show as "Not specified" to customers.'}</p>}
             {providers.length > 0 && <p className="admin-inline-note">{providers.map((provider) => `${providerLabel[provider.name] ?? provider.name}: ${provider.status === 'ok' || provider.foundFields > 0 ? `${provider.foundFields} found` : provider.status}`).join(' · ')}</p>}
             {providers.filter((provider) => provider.status === 'failed' && provider.error).map((provider) => <p key={provider.name} className="admin-inline-note">{providerLabel[provider.name] ?? provider.name}: {provider.error}</p>)}
             {lookupError && <p className="admin-inline-note" role="alert">{lookupError}</p>}
@@ -220,12 +226,9 @@ export function CreateInventoryModal({ role, onClose, onCreate, onFinished }: {
           </div>
           <details className="admin-label full"><summary>Paste specifications from a website</summary>
             <textarea value={pastedText} onChange={(event) => setPastedText(event.target.value)} rows={6} placeholder={'Display: 6.7 inches AMOLED\nChipset: Snapdragon 8 Gen 3\nBattery: 5000 mAh'} />
-            <button type="button" className="button button-outline button-small" disabled={lookupBusy || !pastedText.trim()} onClick={() => void lookup(true)}>Use pasted text</button>
+            <button type="button" className="button button-outline button-small" disabled={lookupBusy || !pastedText.trim()} onClick={applyPaste}>Fill the boxes from pasted text</button>
           </details>
-          <details className="admin-label full"><summary>Advanced: edit specifications directly</summary>
-            <textarea value={jsonText} onChange={(event) => setJsonText(event.target.value)} spellCheck={false} rows={10} />
-            <button type="button" className="button button-outline button-small" onClick={applyJson}>Apply changes</button>
-          </details>
+          {!lookupBusy && <SpecFields value={form} onChange={(next) => { if (Number(batteryMah) > 0 && next.batteryMah !== form.batteryMah) setBatteryMah(next.batteryMah); setForm(next) }} />}
           <label className="admin-check full"><input type="checkbox" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} /> These specifications look right.</label>
           <label className="admin-check full"><input type="checkbox" checked={publish} disabled={!reviewed} onChange={(event) => setPublish(event.target.checked)} /> Show this phone on the shop now.</label>
           {!reviewed && <p className="admin-inline-note full">Without confirming the specifications, the phone is saved as a draft and stays hidden from customers.</p>}

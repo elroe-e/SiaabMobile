@@ -59,6 +59,28 @@ describe('Gemini quota handling', () => {
     expect(bodies[1]).not.toContain('google_search')
   })
 
+  it('skips web search for an hour after the limit is hit, then tries it again', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-key')
+    vi.stubEnv('GEMINI_MODEL', 'gemini-3.0-flash')
+    const start = new Date('2026-11-20T10:00:00Z').getTime()
+    const now = vi.spyOn(Date, 'now').mockReturnValue(start)
+    const bodies: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => {
+      const body = String(init?.body ?? '')
+      bodies.push(body)
+      if (body.includes('google_search')) return new Response(JSON.stringify({ error: { message: 'Quota exceeded', status: 'RESOURCE_EXHAUSTED' } }), { status: 429 })
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"batteryMah":5000,"sourceUrls":[]}' }] } }] }))
+    }))
+    await geminiProvider.fetch({ brand: 'OnePlus', model: '15' })
+    now.mockReturnValue(start + 30 * 60 * 1000)
+    await geminiProvider.fetch({ brand: 'OnePlus', model: '15' })
+    expect(bodies.slice(2).some((body) => body.includes('google_search'))).toBe(false)
+    now.mockReturnValue(start + 61 * 60 * 1000)
+    await geminiProvider.fetch({ brand: 'OnePlus', model: '15' })
+    expect(bodies.slice(3).some((body) => body.includes('google_search'))).toBe(true)
+    now.mockRestore()
+  })
+
   it('reports Google\'s own reason when every attempt is refused', async () => {
     vi.stubEnv('GEMINI_API_KEY', 'test-key')
     vi.stubEnv('GEMINI_MODEL', 'gemini-3.0-flash')

@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
-import { BRANDS, BrandPicker, canonicalBrand, matchBrands } from '../../app/admin/inventory/brand-picker'
+import { BRANDS, BrandPicker, canonicalBrand, matchBrands, matchModels, ModelPicker } from '../../app/admin/inventory/brand-picker'
 
 function Harness() {
   const [brand, setBrand] = useState('')
@@ -61,5 +61,35 @@ describe('brand picker', () => {
     await user.keyboard('{Escape}')
     await user.click(screen.getByLabelText('Model'))
     expect(screen.getByTestId('value')).toHaveTextContent('Samsung')
+  })
+})
+
+function ModelHarness({ brand }: { brand: string }) {
+  const [model, setModel] = useState('')
+  return <form><ModelPicker brand={brand} value={model} onChange={setModel} /><input aria-label="Colour" /><output data-testid="model">{model}</output></form>
+}
+
+describe('model suggestions', () => {
+  it('suggests library phones of the chosen brand, ignoring spaces and capitals', () => {
+    expect(matchModels('Samsung', 'galaxy s24')).toEqual(expect.arrayContaining(['Galaxy S24', 'Galaxy S24 Ultra']))
+    expect(matchModels('samsung', 'galaxy s24')[0]).toBe('Galaxy S24')
+    expect(matchModels('Apple', 'iphone16')).toContain('iPhone 16')
+    expect(matchModels('Apple', 'galaxy')).toEqual([])
+    expect(matchModels('Nokia', '3310')).toEqual([])
+    expect(matchModels('Samsung', 'galaxy').length).toBeLessThanOrEqual(8)
+  })
+
+  it('takes a suggestion with Enter, but Tab keeps what was typed', async () => {
+    const user = userEvent.setup()
+    render(<ModelHarness brand="Samsung" />)
+    const box = screen.getByLabelText('Model')
+    await user.type(box, 'Galaxy S24 U')
+    expect(screen.getByRole('listbox', { name: 'Models' })).toHaveTextContent('Galaxy S24 Ultra')
+    await user.keyboard('{Enter}')
+    expect(screen.getByTestId('model')).toHaveTextContent('Galaxy S24 Ultra')
+    await user.clear(box)
+    await user.type(box, 'Galaxy S2')
+    await user.tab()
+    expect(screen.getByTestId('model')).toHaveTextContent(/^Galaxy S2$/)
   })
 })

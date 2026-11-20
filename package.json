@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "start": "next start",
+    "specs:library": "node scripts/fetch-wiki-phones.mjs && rolldown scripts/build-spec-library.ts --platform node --format esm --file .cache/build-spec-library.mjs --log-level warn && node .cache/build-spec-library.mjs",
     "package:cpanel": "node --env-file-if-exists=.env.local scripts/package-cpanel.mjs"
   },
   "dependencies": {

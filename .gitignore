@@ -31,3 +31,6 @@ coverage
 *.sln
 *.sw?
 /siaabmobile-cpanel.zip
+
+# Downloaded Wikipedia pages for the spec library
+.cache

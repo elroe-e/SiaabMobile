@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { CreateInventoryModal, specRows } from '../../app/admin/inventory/create-modal'
+import { CreateInventoryModal } from '../../app/admin/inventory/create-modal'
 import { colorHex, splitColors, visibleColors } from '../lib/colors'
 
 vi.mock('../../app/admin/inventory/photo-tools', async (importOriginal) => ({
@@ -30,6 +30,8 @@ async function fillBasics(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/^Price/), '99000')
 }
 
+const specsShown = async (chipset = 'Snapdragon 8 Elite') => expect(await screen.findByLabelText('Chipset')).toHaveValue(chipset)
+
 describe('Add phone form', () => {
   it('asks only for the basics, then looks up specifications automatically', async () => {
     const user = userEvent.setup()
@@ -37,8 +39,9 @@ describe('Add phone form', () => {
     expect(screen.queryByLabelText(/short description/i)).toBeNull()
     await fillBasics(user)
     await user.click(screen.getByRole('button', { name: /find specifications/i }))
-    expect(await screen.findByText('Snapdragon 8 Elite')).toBeTruthy()
-    expect(screen.getByText('5000 mAh')).toBeTruthy()
+    await specsShown()
+    expect(screen.getByLabelText('Battery (mAh)')).toHaveValue('5000')
+    expect(screen.getByLabelText('Size (inches)')).toHaveValue('6.7')
     const call = vi.mocked(fetch).mock.calls[0]!
     expect(call[0]).toBe('/api/admin/specs')
     expect(JSON.parse(String((call[1] as RequestInit).body))).toMatchObject({ brand: 'Samsung', model: 'Galaxy S25' })
@@ -51,7 +54,7 @@ describe('Add phone form', () => {
     render(<CreateInventoryModal role="owner" onClose={() => undefined} onCreate={onCreate} onFinished={onFinished} />)
     await fillBasics(user)
     await user.click(screen.getByRole('button', { name: /find specifications/i }))
-    await screen.findByText('Snapdragon 8 Elite')
+    await specsShown()
     await user.click(screen.getByRole('button', { name: 'Save phone' }))
     await waitFor(() => expect(onCreate).toHaveBeenCalled())
     const body = onCreate.mock.calls[0]![0]
@@ -70,7 +73,7 @@ describe('Add phone form', () => {
     await fillBasics(user)
     fireEvent.change(screen.getByLabelText('Add photos'), { target: { files: [new File(['a'], 'front.jpg', { type: 'image/jpeg' }), new File(['b'], 'back.jpg', { type: 'image/jpeg' })] } })
     await user.click(screen.getByRole('button', { name: /find specifications/i }))
-    await screen.findByText('Snapdragon 8 Elite')
+    await specsShown()
     await user.click(screen.getByLabelText(/specifications look right/i))
     await user.click(screen.getByRole('button', { name: 'Save phone' }))
     await waitFor(() => expect(onFinished).toHaveBeenCalledWith('Phone saved and published with 2 photos.'))
@@ -103,8 +106,9 @@ describe('Add phone form', () => {
     await fillBasics(user)
     await user.click(screen.getByRole('button', { name: /find specifications/i }))
     expect(await screen.findByText('AI lookup is busy')).toBeTruthy()
-    expect(screen.getByText('12 GB')).toBeTruthy()
-    expect(screen.getByText('256 GB')).toBeTruthy()
+    expect(screen.getByText(/Kept from step 1: Black, Blue · 12 GB RAM · 256 GB storage\./)).toBeTruthy()
+    expect(screen.getByText(/Nothing was found online/)).toBeTruthy()
+    expect(screen.getByLabelText('Chipset')).toHaveValue('')
   })
 })
 
@@ -117,12 +121,9 @@ describe('values typed by the shop', () => {
     await fillBasics(user)
     await user.type(screen.getByLabelText(/^Battery \(mAh\)/), '5500')
     await user.click(screen.getByRole('button', { name: /find specifications/i }))
-    await screen.findByText('Snapdragon 8 Elite')
-    expect(screen.getByText('12 GB')).toBeTruthy()
-    expect(screen.getByText('256 GB')).toBeTruthy()
-    expect(screen.getByText('5500 mAh')).toBeTruthy()
-    expect(screen.queryByText('8 GB')).toBeNull()
-    expect(screen.queryByText('4000 mAh')).toBeNull()
+    await specsShown()
+    expect(screen.getByText(/Kept from step 1: Black, Blue · 12 GB RAM · 256 GB storage · 5500 mAh battery\./)).toBeTruthy()
+    expect(screen.getByLabelText('Battery (mAh)')).toHaveValue('5500')
 
     await user.click(screen.getByRole('button', { name: 'Save phone' }))
     await waitFor(() => expect(onCreate).toHaveBeenCalled())
@@ -137,7 +138,93 @@ describe('values typed by the shop', () => {
     render(<CreateInventoryModal role="owner" onClose={() => undefined} onCreate={async () => ({ modelId: 'm1' })} onFinished={() => undefined} />)
     await fillBasics(user)
     await user.click(screen.getByRole('button', { name: /find specifications/i }))
-    expect(await screen.findByText('5000 mAh')).toBeTruthy()
+    await specsShown()
+    expect(screen.getByLabelText('Battery (mAh)')).toHaveValue('5000')
+  })
+})
+
+describe('step 2 fill-in list', () => {
+  it('saves what the person types in the boxes and marks it as their own', async () => {
+    const user = userEvent.setup()
+    const onCreate = vi.fn(async (_body: Record<string, unknown>) => ({ modelId: 'm1' }))
+    render(<CreateInventoryModal role="owner" onClose={() => undefined} onCreate={onCreate} onFinished={() => undefined} />)
+    await fillBasics(user)
+    await user.click(screen.getByRole('button', { name: /find specifications/i }))
+    await specsShown()
+    await user.type(screen.getByLabelText('Charging (watts)'), '45')
+    await user.clear(screen.getByLabelText('Refresh rate (Hz)')); await user.type(screen.getByLabelText('Refresh rate (Hz)'), '144')
+    await user.selectOptions(screen.getByLabelText('NFC'), 'yes')
+    await user.click(screen.getByRole('button', { name: 'Save phone' }))
+    await waitFor(() => expect(onCreate).toHaveBeenCalled())
+    const body = onCreate.mock.calls[0]![0] as { specs: Record<string, unknown>; specMeta: Record<string, { source: string }> }
+    expect(body.specs).toMatchObject({ chipset: 'Snapdragon 8 Elite', batteryMah: 5000, chargingWatts: 45, nfc: true, ramGb: 12, storageGb: 256, display: { sizeInches: 6.7, type: 'AMOLED', refreshRateHz: 144 } })
+    for (const key of ['chargingWatts', 'nfc', 'display']) expect(body.specMeta[key]).toMatchObject({ source: 'manual' })
+    expect(body.specMeta.chipset).toBeUndefined()
+  })
+
+  it('fills the boxes from pasted text, keeping the step 1 values and anything typed', async () => {
+    const user = userEvent.setup()
+    const onCreate = vi.fn(async (_body: Record<string, unknown>) => ({ modelId: 'm1' }))
+    render(<CreateInventoryModal role="owner" onClose={() => undefined} onCreate={onCreate} onFinished={() => undefined} />)
+    await fillBasics(user)
+    await user.type(screen.getByLabelText(/^Battery \(mAh\)/), '5500')
+    await user.click(screen.getByRole('button', { name: /find specifications/i }))
+    await specsShown()
+    await user.type(screen.getByLabelText('Water resistance'), 'IP68')
+    await user.click(screen.getByText('Paste specifications from a website'))
+    fireEvent.change(screen.getByPlaceholderText(/Display: 6.7 inches/), { target: { value: 'Chipset: Dimensity 9400\nBattery: 6000 mAh\nRAM: 16 GB\nCharging: 90W' } })
+    await user.click(screen.getByRole('button', { name: 'Fill the boxes from pasted text' }))
+    expect(screen.getByLabelText('Chipset')).toHaveValue('Dimensity 9400')
+    expect(screen.getByLabelText('Charging (watts)')).toHaveValue('90')
+    expect(screen.getByLabelText('Battery (mAh)')).toHaveValue('5500')
+    expect(screen.getByLabelText('Water resistance')).toHaveValue('IP68')
+    await user.click(screen.getByRole('button', { name: 'Save phone' }))
+    await waitFor(() => expect(onCreate).toHaveBeenCalled())
+    const body = onCreate.mock.calls[0]![0] as { specs: Record<string, unknown>; specMeta: Record<string, { source: string }> }
+    expect(body.specs).toMatchObject({ chipset: 'Dimensity 9400', chargingWatts: 90, batteryMah: 5500, ramGb: 12, waterRating: 'IP68' })
+    expect(body.specMeta.chipset).toMatchObject({ source: 'pasted' })
+    expect(body.specMeta.waterRating).toMatchObject({ source: 'manual' })
+    expect(body.specMeta.batteryMah).toMatchObject({ source: 'manual' })
+  })
+
+  it('keeps what was typed or pasted when going Back and searching again', async () => {
+    const user = userEvent.setup()
+    const onCreate = vi.fn(async (_body: Record<string, unknown>) => ({ modelId: 'm1' }))
+    render(<CreateInventoryModal role="owner" onClose={() => undefined} onCreate={onCreate} onFinished={() => undefined} />)
+    await fillBasics(user)
+    await user.click(screen.getByRole('button', { name: /find specifications/i }))
+    await specsShown()
+    await user.type(screen.getByLabelText('Charging (watts)'), '45')
+    await user.click(screen.getByText('Paste specifications from a website'))
+    fireEvent.change(screen.getByPlaceholderText(/Display: 6.7 inches/), { target: { value: 'Operating system: Android 15' } })
+    await user.click(screen.getByRole('button', { name: 'Fill the boxes from pasted text' }))
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    await user.click(screen.getByRole('button', { name: /find specifications/i }))
+    await specsShown()
+    expect(screen.getByLabelText('Charging (watts)')).toHaveValue('45')
+    expect(screen.getByLabelText('Operating system')).toHaveValue('Android 15')
+    await user.click(screen.getByRole('button', { name: 'Search again' }))
+    await specsShown()
+    expect(screen.getByLabelText('Charging (watts)')).toHaveValue('45')
+    await user.click(screen.getByRole('button', { name: 'Save phone' }))
+    await waitFor(() => expect(onCreate).toHaveBeenCalled())
+    const body = onCreate.mock.calls[0]![0] as { specs: Record<string, unknown>; specMeta: Record<string, { source: string }> }
+    expect(body.specs).toMatchObject({ chargingWatts: 45, os: 'Android 15', chipset: 'Snapdragon 8 Elite' })
+    expect(body.specMeta.chargingWatts).toMatchObject({ source: 'manual' })
+    expect(body.specMeta.os).toMatchObject({ source: 'pasted' })
+  })
+
+  it('explains a value it cannot save instead of saving it', async () => {
+    const user = userEvent.setup()
+    const onCreate = vi.fn(async (_body: Record<string, unknown>) => ({ modelId: 'm1' }))
+    render(<CreateInventoryModal role="owner" onClose={() => undefined} onCreate={onCreate} onFinished={() => undefined} />)
+    await fillBasics(user)
+    await user.click(screen.getByRole('button', { name: /find specifications/i }))
+    await specsShown()
+    await user.type(screen.getByLabelText('Charging (watts)'), 'fast')
+    await user.click(screen.getByRole('button', { name: 'Save phone' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Charging/)
+    expect(onCreate).not.toHaveBeenCalled()
   })
 })
 
@@ -151,9 +238,5 @@ describe('colour and spec helpers', () => {
     expect(colorHex('Midnight Black')).toBe('#1f2430')
     expect(colorHex('Mystery Shade')).toBe('#8a94a6')
     expect(visibleColors([{ name: 'Unspecified', hex: '#777' }, { name: 'Blue', hex: '#00f' }])).toEqual([{ name: 'Blue', hex: '#00f' }])
-  })
-  it('turns specs into readable rows and skips empty values', () => {
-    const rows = specRows({ chipset: 'A17 Pro', batteryMah: 3274, fiveG: true, os: null })
-    expect(rows).toEqual([['Chipset', 'A17 Pro'], ['Battery', '3274 mAh'], ['5G', 'Yes']])
   })
 })

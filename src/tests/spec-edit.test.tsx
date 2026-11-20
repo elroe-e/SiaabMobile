@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { editedMeta, formToSpecs, specsChanged, specsToForm } from '../../app/admin/inventory/spec-fields'
 import { InventoryManager } from '../../app/admin/inventory/ui'
-import library from '../data/spec-library.json'
+import generated from '../data/spec-library.generated.json'
+import curated from '../data/spec-library.json'
 
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams() }))
 vi.mock('../../app/admin/inventory/photo-tools', () => ({ isPhotoFile: () => true, preparePhoto: vi.fn(), uploadPhoto: vi.fn() }))
@@ -26,7 +27,7 @@ describe('specification form', () => {
   })
 
   it('leaves every saved-library phone untouched when nothing is changed', () => {
-    for (const entry of library as { model: string; specs: Record<string, unknown> }[]) {
+    for (const entry of [...curated, ...generated] as { model: string; specs: Record<string, unknown> }[]) {
       const result = formToSpecs(specsToForm(entry.specs), entry.specs)
       expect(result, entry.model).toEqual({ specs: entry.specs })
     }

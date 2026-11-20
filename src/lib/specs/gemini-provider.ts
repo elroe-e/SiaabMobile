@@ -34,7 +34,9 @@ export function extractJson(text: string): string {
 const API = 'https://generativelanguage.googleapis.com/v1beta'
 const DEFAULT_MODEL = 'gemini-flash-latest'
 let discoveredModel: string | null = null
-let groundingUnavailable = false
+// After Google says web search is over its limit, plain requests are used for an hour, then web search is tried again.
+const GROUNDING_RETRY_MS = 60 * 60 * 1000
+let groundingBlockedUntil = 0
 // Google's free tier is sometimes slow or overloaded, so the lookup gets one overall time budget.
 const TOTAL_BUDGET_MS = 60_000
 const SEARCH_TIMEOUT_MS = 25_000
@@ -77,7 +79,7 @@ export const describeAttempts = (attempts: Attempt[]) =>
 const isKeyProblem = (response: Response | null) => response !== null && [400, 401, 403].includes(response.status)
 
 /** Resets remembered model choices; used by tests. */
-export function resetGeminiState() { discoveredModel = null; groundingUnavailable = false }
+export function resetGeminiState() { discoveredModel = null; groundingBlockedUntil = 0 }
 
 export const geminiProvider: SpecProvider = {
   name: 'ai',
@@ -129,12 +131,12 @@ export const geminiProvider: SpecProvider = {
     const keepGoing = (response: Response | null) => !response?.ok && !isKeyProblem(response) && remaining() > 5_000
 
     let response: Response | null = null
-    if (!groundingUnavailable) {
+    if (Date.now() >= groundingBlockedUntil) {
       response = await attempt(modelName, true)
       // Google retires model names; when ours is gone, switch to a current one.
       if (response?.status === 404) { const next = await otherModel(); if (next) { discoveredModel = modelName = next; response = await attempt(modelName, true) } }
-      // The free tier may not include web search; remember that and use plain requests from now on.
-      if (response?.status === 429) groundingUnavailable = true
+      // The free tier's web search limit was reached; use plain requests for the next hour.
+      if (response?.status === 429) groundingBlockedUntil = Date.now() + GROUNDING_RETRY_MS
     }
     if (keepGoing(response)) {
       response = await attempt(modelName, false)
