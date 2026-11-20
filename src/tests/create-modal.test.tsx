@@ -108,6 +108,39 @@ describe('Add phone form', () => {
   })
 })
 
+describe('values typed by the shop', () => {
+  it('keeps the typed RAM, storage, battery and colours even when the online lookup says otherwise', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ specs: { chipset: 'Snapdragon 8 Elite', ramGb: 8, storageGb: 128, batteryMah: 4000 }, metadata: { ramGb: { source: 'ai', locked: false }, batteryMah: { source: 'ai', locked: false } }, providers: [{ name: 'ai', status: 'found', foundFields: 4 }] }))))
+    const onCreate = vi.fn(async (_body: Record<string, unknown>) => ({ modelId: 'm1' }))
+    render(<CreateInventoryModal role="owner" onClose={() => undefined} onCreate={onCreate} onFinished={() => undefined} />)
+    await fillBasics(user)
+    await user.type(screen.getByLabelText(/^Battery \(mAh\)/), '5500')
+    await user.click(screen.getByRole('button', { name: /find specifications/i }))
+    await screen.findByText('Snapdragon 8 Elite')
+    expect(screen.getByText('12 GB')).toBeTruthy()
+    expect(screen.getByText('256 GB')).toBeTruthy()
+    expect(screen.getByText('5500 mAh')).toBeTruthy()
+    expect(screen.queryByText('8 GB')).toBeNull()
+    expect(screen.queryByText('4000 mAh')).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Save phone' }))
+    await waitFor(() => expect(onCreate).toHaveBeenCalled())
+    const body = onCreate.mock.calls[0]![0] as { specs: Record<string, unknown>; specMeta: Record<string, { source: string; locked: boolean }>; variant: Record<string, unknown> }
+    expect(body.specs).toMatchObject({ ramGb: 12, storageGb: 256, batteryMah: 5500, chipset: 'Snapdragon 8 Elite' })
+    expect(body.variant).toMatchObject({ colorName: 'Black, Blue', ramGb: 12, storageGb: 256 })
+    for (const key of ['ramGb', 'storageGb', 'batteryMah']) expect(body.specMeta[key]).toMatchObject({ source: 'manual', locked: true })
+  })
+
+  it('still lets the lookup suggest a battery when none was typed', async () => {
+    const user = userEvent.setup()
+    render(<CreateInventoryModal role="owner" onClose={() => undefined} onCreate={async () => ({ modelId: 'm1' })} onFinished={() => undefined} />)
+    await fillBasics(user)
+    await user.click(screen.getByRole('button', { name: /find specifications/i }))
+    expect(await screen.findByText('5000 mAh')).toBeTruthy()
+  })
+})
+
 describe('colour and spec helpers', () => {
   it('splits several colours typed by the owner', () => {
     expect(splitColors('Black, Blue')).toEqual(['Black', 'Blue'])

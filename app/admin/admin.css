@@ -43,6 +43,9 @@
 /* Figures are the content of a stat card, so they carry no icon. */
 .admin-stat-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; margin-bottom: 16px; }
 .admin-stat { display: flex; flex-direction: column; gap: 8px; padding: 16px 20px; border: 1px solid #e4e8ef; border-radius: 12px; background: #fff; }
+a.admin-stat { color: inherit; text-decoration: none; transition: border-color .15s, box-shadow .15s; }
+a.admin-stat:hover { border-color: #c5cede; box-shadow: 0 2px 8px rgba(16,24,40,.06); }
+a.admin-stat:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 .admin-stat-head { color: var(--muted); font-size: 13px; font-weight: 500; }
 .admin-stat-value { color: var(--ink); font: 600 28px/1.15 var(--font-manrope), Manrope, sans-serif; letter-spacing: -.01em; }
 .admin-stat-note { color: var(--muted); font-size: 12px; }
@@ -82,11 +85,25 @@
 .admin-label { display: flex; flex-direction: column; gap: 8px; color: #43516a; font-size: 13px; font-weight: 500; }
 .admin-label input, .admin-label select, .admin-label textarea { width: 100%; min-height: 40px; padding: 0 12px; border: 1px solid #dce2ea; border-radius: 8px; background: #fff; color: var(--ink); font: 14px var(--font-dm-sans), 'DM Sans', sans-serif; }
 .admin-label textarea { min-height: 152px; padding: 12px; resize: vertical; font-family: ui-monospace,Consolas,monospace; font-size: 13px; line-height: 1.5; }
+.admin-combo { position: relative; }
+.admin-label .admin-combo input { padding-left: 44px; }
+.admin-combo-toggle { position: absolute; left: 4px; top: 50%; z-index: 1; display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 6px; background: transparent; color: #66748b; cursor: pointer; transform: translateY(-50%); }
+.admin-combo-toggle:hover { background: #f1f4f9; color: var(--ink); }
+.admin-combo-toggle svg { transition: transform .15s; }
+.admin-combo-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+.admin-combo-list { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 5; max-height: 248px; margin: 0; padding: 4px; overflow-y: auto; list-style: none; border: 1px solid #dce2ea; border-radius: 8px; background: #fff; box-shadow: 0 8px 24px rgba(16,24,40,.12); }
+.admin-combo-list li { display: flex; align-items: center; min-height: 40px; padding: 0 12px; border-radius: 6px; color: var(--ink); font-size: 14px; cursor: pointer; }
+.admin-combo-list li[aria-selected="true"] { background: #eef3ff; color: #1d4ed8; }
 .admin-input:focus, .admin-select:focus, .admin-label input:focus, .admin-label select:focus, .admin-label textarea:focus { border-color: #7ca4f9; outline: 3px solid rgba(21,94,239,.12); }
 .admin-check { display: flex; flex-direction: row; align-items: flex-start; gap: 8px; color: var(--ink-soft); font-size: 13px; font-weight: 400; line-height: 1.5; }
 .admin-check input { width: 16px; min-height: 16px; height: 16px; margin: 2px 0 0; padding: 0; accent-color: var(--blue); }
 .admin-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .admin-form-grid .full { grid-column: 1 / -1; }
+.admin-form-heading { margin: 8px 0 -4px; padding-top: 16px; border-top: 1px solid #e4e8ef; color: var(--ink); font-size: 15px; font-weight: 600; }
+.admin-form-heading:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+.admin-camera-row { display: grid; grid-template-columns: 1fr 110px 1.4fr 40px; align-items: end; gap: 12px; }
+.admin-camera-row .admin-icon-button { margin-bottom: 0; }
+.admin-add-camera { justify-self: start; }
 .admin-form-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .admin-form-grid + .button { margin-top: 16px; }
 
@@ -169,6 +186,9 @@
   .admin-stat-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 @media (max-width: 700px) {
+  .admin-combo-list li { min-height: 44px; font-size: 16px; }
+  .admin-camera-row { grid-template-columns: 1fr 1fr; }
+  .admin-camera-row .admin-label:nth-child(3) { grid-column: 1 / -1; }
   .admin-sidebar { display: none; }
   .admin-workspace { margin: 0; padding: 16px 16px 96px; }
   .admin-topbar { margin-bottom: 16px; }

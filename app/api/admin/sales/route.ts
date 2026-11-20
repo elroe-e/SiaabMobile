@@ -6,6 +6,7 @@ const actionSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('sell_new'), id: z.string().uuid(), quantity: z.number().int().min(1), price: z.number().positive(), note: z.string().max(1000).optional() }).strict(),
   z.object({ action: z.literal('sell_used'), id: z.string().uuid(), price: z.number().positive(), note: z.string().max(1000).optional() }).strict(),
   z.object({ action: z.literal('undo'), id: z.string().uuid() }).strict(),
+  z.object({ action: z.literal('restock'), id: z.string().uuid(), quantity: z.number().int().min(1).max(1000).default(1) }).strict(),
   z.object({ action: z.literal('reserve'), id: z.string().uuid(), days: z.number().int().min(1).max(14) }).strict(),
 ])
 
@@ -42,6 +43,8 @@ export async function POST(request: Request) {
         ? await db.rpc('sell_used_unit', { p_unit_id: input.id, p_sale_price: input.price, p_buyer_note: input.note ?? null })
         : input.action === 'undo'
           ? await db.rpc('undo_sale', { p_sale_id: input.id })
+          : input.action === 'restock'
+            ? await db.rpc('restock_from_sale', { p_sale_id: input.id, p_quantity: input.quantity })
           : await db.rpc('reserve_used_unit', { p_unit_id: input.id, p_days: input.days })
     if (rpc.error) return NextResponse.json({ error: rpc.error.message }, { status: 400 })
     return NextResponse.json({ result: rpc.data ?? 'ok' }, { status: 200 })

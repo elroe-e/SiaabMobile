@@ -112,6 +112,65 @@ describe('permissions the database still enforces', () => {
   })
 })
 
+describe('editing a phone that is already on the shop', () => {
+  it('lets a seller rename it and change its specifications and used-phone details, and records who did it', async () => {
+    const { modelId, unitId } = await addPhone(seller, 'used', 'samsung-edit-me')
+    const specs = { chipset: 'Y', batteryMah: 5100 }
+    const renamed = await seller.from('phone_models').update({ name: 'Edited Phone', slug: 'samsung-edited-phone', specs, spec_meta: { batteryMah: { source: 'manual' } } }).eq('id', modelId)
+    expect(renamed.error).toBeNull()
+    const unit = await seller.from('used_units').update({ grade: 'B', ram_gb: 12, storage_gb: 512, color_name: 'White', battery_health_pct: 90 }).eq('id', unitId!)
+    expect(unit.error).toBeNull()
+
+    const { data: shown } = await publicDb.from('public_models').select('name,slug,specs').eq('id', modelId).maybeSingle()
+    expect(shown).toMatchObject({ name: 'Edited Phone', slug: 'samsung-edited-phone', specs })
+    const { data: shownUnit } = await publicDb.from('public_used_units').select('grade,ram_gb,storage_gb,color_name').eq('id', unitId!).maybeSingle()
+    expect(shownUnit).toMatchObject({ grade: 'B', ram_gb: 12, storage_gb: 512, color_name: 'White' })
+
+    const { rows } = await test.pg.query<{ table_name: string; user_id: string }>("select table_name, user_id from public.audit_log where action = 'UPDATE' and record_id in ($1, $2)", [modelId, unitId])
+    expect(rows.map((row) => row.table_name).sort()).toEqual(['phone_models', 'used_units'])
+    expect(new Set(rows.map((row) => row.user_id)).size).toBe(1)
+    const { rows: who } = await test.pg.query<{ role: string }>('select role from public.profiles where id = $1', [rows[0]!.user_id])
+    expect(who[0]?.role).toBe('staff')
+  })
+})
+
+describe('restocking from a sale', () => {
+  it('adds stock back to the same new-phone line and keeps the sale recorded', async () => {
+    const { modelId } = await addPhone(seller, 'new', 'samsung-restock-new')
+    const { data: variant } = await seller.from('variants').select('id,stock_count').eq('model_id', modelId).maybeSingle()
+    const { data: saleId, error: sellError } = await seller.rpc('sell_variant', { p_variant_id: variant!.id, p_quantity: 2, p_sale_price: 50000, p_buyer_note: null })
+    expect(sellError).toBeNull()
+
+    const { error } = await seller.rpc('restock_from_sale', { p_sale_id: saleId, p_quantity: 4 })
+    expect(error).toBeNull()
+    const { data: after } = await seller.from('variants').select('stock_count,price').eq('id', variant!.id).maybeSingle()
+    expect(after).toMatchObject({ stock_count: 3 - 2 + 4, price: 50000 })
+    const { data: sale } = await seller.from('sales').select('undone_at').eq('id', saleId as string).maybeSingle()
+    expect(sale).toMatchObject({ undone_at: null })
+  })
+
+  it('adds a new used phone copied from the sold one, without its IMEI, cost or notes', async () => {
+    const { unitId } = await addPhone(owner, 'used', 'samsung-restock-used', { batteryHealthPct: 91, accessories: 'Box and charger', warrantyMonths: 3, costPrice: 20000, imei: '123456789012345', notesInternal: 'scratch on back' })
+    const { data: saleId } = await owner.rpc('sell_used_unit', { p_unit_id: unitId, p_sale_price: 30000, p_buyer_note: null })
+
+    const { data: newId, error } = await seller.rpc('restock_from_sale', { p_sale_id: saleId, p_quantity: 1 })
+    expect(error).toBeNull()
+    expect(newId).not.toBe(unitId)
+    const { data: copy } = await owner.from('admin_used_units').select('*').eq('id', newId as string).maybeSingle()
+    expect(copy).toMatchObject({ ram_gb: 8, storage_gb: 128, color_name: 'Blue', grade: 'A', battery_health_pct: 91, accessories: 'Box and charger', warranty_months: 3, price: 30000, status: 'available', is_published: true, cost_price: null, imei: null, notes_internal: '' })
+    const { data: old } = await owner.from('used_units').select('status').eq('id', unitId!).maybeSingle()
+    expect(old).toMatchObject({ status: 'sold' })
+
+    const { error: tooMany } = await seller.rpc('restock_from_sale', { p_sale_id: saleId, p_quantity: 2 })
+    expect(tooMany?.message).toMatch(/one at a time/)
+  })
+
+  it('refuses a restock from someone who is not signed in', async () => {
+    const { error } = await publicDb.rpc('restock_from_sale', { p_sale_id: '33333333-3333-4333-8333-333333333333', p_quantity: 1 })
+    expect(error).not.toBeNull()
+  })
+})
+
 describe('the selling check script', () => {
   // Runs the script's steps as an owner inside a transaction that is cancelled, the way the script itself does.
   const runCheck = async (before = '') => {

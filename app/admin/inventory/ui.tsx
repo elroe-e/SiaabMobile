@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import { fullPhoneName } from '../../../src/lib/format'
 import { preparePhoto } from './photo-tools'
 import { CreateInventoryModal } from './create-modal'
+import { SpecFields, editedMeta, formToSpecs, specsChanged, specsToForm } from './spec-fields'
 import { ArrowLeft, ArrowRight, Camera, CircleDollarSign, PackagePlus, Pencil, RefreshCw, Search, Smartphone, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
@@ -87,10 +88,16 @@ export function InventoryManager({ role }: { role: Role }) {
     return result
   }
 
-  const update = async (body: Record<string, unknown>) => {
-    const response = await fetch('/api/admin/inventory', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.error ?? 'Could not update inventory.')
+  /** Saves the phone model (name, specifications) first, then the stock line, so a refused name or spec change leaves everything as it was. */
+  const update = async (bodies: Record<string, unknown>[]) => {
+    for (const [index, body] of bodies.entries()) {
+      const response = await fetch('/api/admin/inventory', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+      const result = await response.json()
+      if (!response.ok) {
+        if (index > 0) void refresh()
+        throw new Error(index > 0 ? `The name and specifications were saved, but the rest was not: ${result.error ?? 'Could not update inventory.'}` : result.error ?? 'Could not update inventory.')
+      }
+    }
     setEditing(null); setNotice('Inventory updated.'); await refresh()
   }
 
@@ -119,11 +126,11 @@ export function InventoryManager({ role }: { role: Role }) {
       {loading ? <div className="admin-empty">Loading inventory…</div> : <>
         {(filter === 'all' || filter === 'new') && <InventoryTable title="New phones" count={visibleVariants.length}>
           <thead><tr><th>Model</th><th>Configuration</th><th>Price</th><th>Stock</th><th>Visibility</th><th>Actions</th></tr></thead>
-          <tbody>{visibleVariants.map((row) => <tr key={row.id}><td><strong>{brandName(rel(row)?.brands ?? null)} {rel(row)?.name}</strong><small>{rel(row)?.slug}</small></td><td>{row.ram_gb}GB / {row.storage_gb}GB · {row.color_name}</td><td>{money(row.price)}</td><td><span className={`admin-badge ${row.stock_count === 0 ? 'red' : row.stock_count <= row.low_stock_threshold ? 'amber' : 'green'}`}>{row.stock_count} in stock</span></td><td><span className={`admin-badge ${row.is_published ? 'green' : 'gray'}`}>{row.is_published ? 'Published' : 'Draft'}</span></td><td><div className="admin-table-actions"><button className="admin-icon-button" title="Edit stock, price or visibility" onClick={() => setEditing({ type: 'variant', item: row })}><Pencil size={16} /></button><button className="admin-icon-button" title="Add model photos" onClick={() => setPhotoTarget({ id: row.model_id, kind: 'model', label: rel(row)?.name ?? 'Model' })}><Camera size={16} /></button><button className="admin-icon-button" title="Record sale" onClick={() => void askSell(row, 'new')}><CircleDollarSign size={16} /></button>{role === 'owner' && <button className="admin-icon-button danger" title="Delete variant" onClick={() => void deleteItem(row.id, 'variant', rel(row)?.name ?? 'variant')}><Trash2 size={16} /></button>}</div></td></tr>)}</tbody>
+          <tbody>{visibleVariants.map((row) => <tr key={row.id}><td><strong>{brandName(rel(row)?.brands ?? null)} {rel(row)?.name}</strong><small>{rel(row)?.slug}</small></td><td>{row.ram_gb}GB / {row.storage_gb}GB · {row.color_name}</td><td>{money(row.price)}</td><td><span className={`admin-badge ${row.stock_count === 0 ? 'red' : row.stock_count <= row.low_stock_threshold ? 'amber' : 'green'}`}>{row.stock_count} in stock</span></td><td><span className={`admin-badge ${row.is_published ? 'green' : 'gray'}`}>{row.is_published ? 'Published' : 'Draft'}</span></td><td><div className="admin-table-actions"><button className="admin-icon-button" title="Edit phone details and specifications" onClick={() => setEditing({ type: 'variant', item: row })}><Pencil size={16} /></button><button className="admin-icon-button" title="Add model photos" onClick={() => setPhotoTarget({ id: row.model_id, kind: 'model', label: rel(row)?.name ?? 'Model' })}><Camera size={16} /></button><button className="admin-icon-button" title="Record sale" onClick={() => void askSell(row, 'new')}><CircleDollarSign size={16} /></button>{role === 'owner' && <button className="admin-icon-button danger" title="Delete variant" onClick={() => void deleteItem(row.id, 'variant', rel(row)?.name ?? 'variant')}><Trash2 size={16} /></button>}</div></td></tr>)}</tbody>
         </InventoryTable>}
         {(filter === 'all' || filter === 'used') && <InventoryTable title="Used phones" count={visibleUsed.length}>
           <thead><tr><th>Model</th><th>Condition</th><th>Price</th><th>Stock state</th><th>Visibility</th><th>Actions</th></tr></thead>
-          <tbody>{visibleUsed.map((row) => <tr key={row.id}><td><strong>{brandName(rel(row)?.brands ?? null)} {rel(row)?.name}</strong><small>{row.ram_gb}GB / {row.storage_gb}GB · {row.color_name}</small></td><td>Grade {row.grade}{row.battery_health_pct ? ` · ${row.battery_health_pct}% battery` : ''}</td><td>{money(row.price)}{role === 'owner' && row.cost_price != null && <small>Cost {money(row.cost_price)}</small>}</td><td><span className={`admin-badge ${row.status === 'sold' ? 'gray' : row.status === 'reserved' ? 'amber' : row.status === 'hidden' ? 'red' : 'green'}`}>{row.status === 'reserved' && row.reserved_until ? `Reserved until ${new Date(row.reserved_until).toLocaleDateString()}` : row.status}</span></td><td><span className={`admin-badge ${row.is_published ? 'green' : 'gray'}`}>{row.is_published ? 'Published' : 'Draft'}</span></td><td><div className="admin-table-actions"><button className="admin-icon-button" title="Edit used-unit details" onClick={() => setEditing({ type: 'unit', item: row })}><Pencil size={16} /></button><button className="admin-icon-button" title="Add unit photos" onClick={() => setPhotoTarget({ id: row.id, kind: 'unit', label: rel(row)?.name ?? 'Used phone' })}><Camera size={16} /></button>{row.status === 'available' || row.status === 'reserved' ? <><button className="admin-icon-button" title="Reserve" onClick={() => void reserve(row)}><Smartphone size={16} /></button><button className="admin-icon-button" title="Record sale" onClick={() => void askSell(row, 'used')}><CircleDollarSign size={16} /></button></> : null}{role === 'owner' && <button className="admin-icon-button danger" title="Delete used unit" onClick={() => void deleteItem(row.id, 'unit', rel(row)?.name ?? 'used unit')}><Trash2 size={16} /></button>}</div></td></tr>)}</tbody>
+          <tbody>{visibleUsed.map((row) => <tr key={row.id}><td><strong>{brandName(rel(row)?.brands ?? null)} {rel(row)?.name}</strong><small>{row.ram_gb}GB / {row.storage_gb}GB · {row.color_name}</small></td><td>Grade {row.grade}{row.battery_health_pct ? ` · ${row.battery_health_pct}% battery` : ''}</td><td>{money(row.price)}{role === 'owner' && row.cost_price != null && <small>Cost {money(row.cost_price)}</small>}</td><td><span className={`admin-badge ${row.status === 'sold' ? 'gray' : row.status === 'reserved' ? 'amber' : row.status === 'hidden' ? 'red' : 'green'}`}>{row.status === 'reserved' && row.reserved_until ? `Reserved until ${new Date(row.reserved_until).toLocaleDateString()}` : row.status}</span></td><td><span className={`admin-badge ${row.is_published ? 'green' : 'gray'}`}>{row.is_published ? 'Published' : 'Draft'}</span></td><td><div className="admin-table-actions"><button className="admin-icon-button" title="Edit phone details and specifications" onClick={() => setEditing({ type: 'unit', item: row })}><Pencil size={16} /></button><button className="admin-icon-button" title="Add unit photos" onClick={() => setPhotoTarget({ id: row.id, kind: 'unit', label: rel(row)?.name ?? 'Used phone' })}><Camera size={16} /></button>{row.status === 'available' || row.status === 'reserved' ? <><button className="admin-icon-button" title="Reserve" onClick={() => void reserve(row)}><Smartphone size={16} /></button><button className="admin-icon-button" title="Record sale" onClick={() => void askSell(row, 'used')}><CircleDollarSign size={16} /></button></> : null}{role === 'owner' && <button className="admin-icon-button danger" title="Delete used unit" onClick={() => void deleteItem(row.id, 'unit', rel(row)?.name ?? 'used unit')}><Trash2 size={16} /></button>}</div></td></tr>)}</tbody>
         </InventoryTable>}
         {(filter === 'all' || filter === 'upcoming') && <InventoryTable title="Upcoming models" count={visibleModels.length}>
           <thead><tr><th>Model</th><th>Expected date / price</th><th>Specifications</th><th>Visibility</th><th>Actions</th></tr></thead>
@@ -132,7 +139,7 @@ export function InventoryManager({ role }: { role: Role }) {
       </>}
     </div>
     {adding && <CreateInventoryModal role={role} onClose={() => setAdding(false)} onCreate={create} onFinished={(message) => { setAdding(false); setNotice(message); void refresh() }} />}
-    {editing && <UpdateInventoryModal role={role} target={editing} onClose={() => setEditing(null)} onSave={update} />}
+    {editing && <UpdateInventoryModal role={role} target={editing} models={data.models} onClose={() => setEditing(null)} onSave={update} />}
     {photoTarget && <PhotoModal target={photoTarget} onClose={() => setPhotoTarget(null)} />}
     <p className="admin-inline-note" style={{ marginTop: 12 }}>For a new sale or reservation, choose the matching action. Every sale is recorded transactionally; undo restores stock.</p>
   </section>
@@ -142,77 +149,109 @@ function InventoryTable({ title, count, children }: { title: string; count: numb
   return <section className="admin-inventory-table-section"><div className="admin-card-title"><h3>{title}</h3><span>{count} records</span></div>{count === 0 ? <div className="admin-empty">No matching inventory yet.</div> : <><div className="admin-table-wrap"><table className="admin-table">{children}</table></div><div className="admin-mobile-card-list">{/* Rows remain available in the scrollable table on larger screens. */}</div></>}</section>
 }
 
-function UpdateInventoryModal({ role, target, onClose, onSave }: {
+function UpdateInventoryModal({ role, target, models, onClose, onSave }: {
   role: Role
   target: { type: 'variant' | 'unit' | 'model'; item: VariantRow | UsedRow | ModelRow }
+  models: ModelRow[]
   onClose: () => void
-  onSave: (body: Record<string, unknown>) => Promise<void>
+  onSave: (bodies: Record<string, unknown>[]) => Promise<void>
 }) {
   const item = target.item
   const variant = target.type === 'variant' ? item as VariantRow : null
   const unit = target.type === 'unit' ? item as UsedRow : null
-  const model = target.type === 'model' ? item as ModelRow : null
+  const model = target.type === 'model' ? item as ModelRow : models.find((row) => row.id === (variant ?? unit)?.model_id) ?? null
+  const originalSpecs = model?.specs ?? {}
+  const [modelName, setModelName] = useState(model?.name ?? '')
+  const [specForm, setSpecForm] = useState(() => specsToForm(originalSpecs))
+  const [reviewed, setReviewed] = useState(model?.specs_reviewed ?? false)
+  const [colorName, setColorName] = useState(/^unspecified$/i.test(variant?.color_name ?? unit?.color_name ?? '') ? '' : variant?.color_name ?? unit?.color_name ?? '')
+  const [ramGb, setRamGb] = useState(String(variant?.ram_gb ?? unit?.ram_gb ?? ''))
+  const [storageGb, setStorageGb] = useState(String(variant?.storage_gb ?? unit?.storage_gb ?? ''))
   const [stockCount, setStockCount] = useState(String(variant?.stock_count ?? ''))
   const [price, setPrice] = useState(String(variant?.price ?? unit?.price ?? ''))
   const [threshold, setThreshold] = useState(String(variant?.low_stock_threshold ?? ''))
   const [published, setPublished] = useState(variant?.is_published ?? unit?.is_published ?? false)
-  const [colorName, setColorName] = useState(/^unspecified$/i.test(variant?.color_name ?? '') ? '' : variant?.color_name ?? '')
-  const [confirmSpecs, setConfirmSpecs] = useState(false)
-  const specsUnconfirmed = Boolean(variant || unit) && rel((variant ?? unit)!)?.specs_reviewed === false
+  const [grade, setGrade] = useState(unit?.grade ?? 'A')
+  const [battery, setBattery] = useState(String(unit?.battery_health_pct ?? ''))
+  const [accessories, setAccessories] = useState(unit?.accessories ?? '')
+  const [warranty, setWarranty] = useState(String(unit?.warranty_months ?? 0))
   const [costPrice, setCostPrice] = useState(String(unit?.cost_price ?? ''))
   const [imei, setImei] = useState(unit?.imei ?? '')
   const [notes, setNotes] = useState(unit?.notes_internal ?? '')
-  const [expectedDate, setExpectedDate] = useState(model?.expected_date ?? '')
-  const [expectedPriceRange, setExpectedPriceRange] = useState(model?.expected_price_range ?? '')
-  const [specs, setSpecs] = useState(JSON.stringify(model?.specs ?? {}, null, 2))
-  const [reviewed, setReviewed] = useState(model?.specs_reviewed ?? false)
+  const [expectedDate, setExpectedDate] = useState(target.type === 'model' ? model?.expected_date ?? '' : '')
+  const [expectedPriceRange, setExpectedPriceRange] = useState(target.type === 'model' ? model?.expected_price_range ?? '' : '')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setBusy(true); setError('')
-    if ((variant || unit) && published && specsUnconfirmed && !confirmSpecs) { setBusy(false); setError('Confirm the phone specifications before publishing it.'); return }
-    let body: Record<string, unknown>
-    if (variant) body = { type: 'variant', id: variant.id, stockCount: Number(stockCount), price: Number(price), lowStockThreshold: Number(threshold), isPublished: published, ...(colorName.trim() && colorName.trim() !== variant.color_name ? { colorName: colorName.trim() } : {}), ...(confirmSpecs ? { confirmSpecs: true } : {}) }
-    else if (unit) body = { type: 'unit', id: unit.id, price: Number(price), isPublished: published, ...(confirmSpecs ? { confirmSpecs: true } : {}), ...(role === 'owner' ? { costPrice: costPrice ? Number(costPrice) : null, imei: imei || null, notesInternal: notes } : {}) }
-    else if (model) {
-      try { body = { type: 'model', id: model.id, expectedDate, expectedPriceRange, specs: JSON.parse(specs), specMeta: model.spec_meta, specsReviewed: reviewed } }
-      catch { setBusy(false); setError('Specifications must be valid JSON.'); return }
-    } else { setBusy(false); return }
-    try { await onSave(body) } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save changes.'); setBusy(false) }
+    setError('')
+    if ((variant || unit) && published && !reviewed) { setError('Tick “These specifications look right” before publishing this phone.'); return }
+    const bodies: Record<string, unknown>[] = []
+    if (model) {
+      const converted = formToSpecs(specForm, originalSpecs)
+      if ('error' in converted) { setError(converted.error); return }
+      const changed = specsChanged(originalSpecs, converted.specs)
+      const name = modelName.trim()
+      if (!name) { setError('Enter the model name.'); return }
+      const modelBody: Record<string, unknown> = {
+        ...(name !== model.name ? { name } : {}),
+        ...(changed ? { specs: converted.specs, specMeta: editedMeta(originalSpecs, converted.specs, model.spec_meta ?? {}) } : {}),
+        ...(reviewed && !model.specs_reviewed ? { specsReviewed: true } : {}),
+        ...(target.type === 'model' ? { expectedDate, expectedPriceRange } : {}),
+      }
+      if (Object.keys(modelBody).length) bodies.push({ type: 'model', id: model.id, ...modelBody })
+    }
+    const sizes = { ramGb: Number(ramGb), storageGb: Number(storageGb) }
+    if (variant) bodies.push({ type: 'variant', id: variant.id, ...sizes, stockCount: Number(stockCount), price: Number(price), lowStockThreshold: Number(threshold), isPublished: published, ...(colorName.trim() && colorName.trim() !== variant.color_name ? { colorName: colorName.trim() } : {}) })
+    if (unit) bodies.push({ type: 'unit', id: unit.id, ...sizes, price: Number(price), isPublished: published, grade, batteryHealthPct: battery ? Number(battery) : null, accessories, warrantyMonths: Number(warranty), ...(colorName.trim() && colorName.trim() !== unit.color_name ? { colorName: colorName.trim() } : {}), ...(role === 'owner' ? { costPrice: costPrice ? Number(costPrice) : null, imei: imei || null, notesInternal: notes } : {}) })
+    if (!bodies.length) { onClose(); return }
+    setBusy(true)
+    try { await onSave(bodies) } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save changes.'); setBusy(false) }
   }
 
-  const name = variant || unit ? `${rel((variant ?? unit)! )?.name ?? 'Phone'} ${variant ? 'variant' : 'used unit'}` : `${model?.name ?? 'Upcoming model'}`
+  const brand = model ? brandName(model.brands) : brandName(rel((variant ?? unit)!)?.brands ?? null)
+  const name = `${fullPhoneName(brand, model?.name ?? rel((variant ?? unit)!)?.name ?? 'Phone')}${variant ? ' · new phone' : unit ? ' · used phone' : ' · upcoming'}`
   return <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
     <section className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="edit-inventory-title">
       <header className="admin-modal-header"><div><h2 id="edit-inventory-title">Edit inventory</h2><p>{name}</p></div><button className="admin-icon-button" type="button" onClick={onClose} aria-label="Close">×</button></header>
       <form onSubmit={(event) => void submit(event)}>
         <div className="admin-form-grid">
-          {variant && <>
+          <h3 className="admin-form-heading full">Phone details</h3>
+          {model && <label className="admin-label full">Model name<input required maxLength={120} value={modelName} onChange={(event) => setModelName(event.target.value)} placeholder="Galaxy S25 Ultra" /><small className="admin-inline-note">Brand: {brand || 'not set'}. A new name changes the phone’s web address, so links shared earlier stop working. It changes the name for every colour and storage of this phone.</small></label>}
+          {(variant || unit) && <>
             <label className="admin-label full">Colour<input maxLength={50} value={colorName} onChange={(event) => setColorName(event.target.value)} placeholder="Black" /><small className="admin-inline-note">Customers see the colour but cannot choose it.</small></label>
-            <label className="admin-label">Quantity in stock<input type="number" min="0" required value={stockCount} onChange={(event) => setStockCount(event.target.value)} /></label>
+            <label className="admin-label">RAM (GB)<input type="number" min="1" max="24" required value={ramGb} onChange={(event) => setRamGb(event.target.value)} /></label>
+            <label className="admin-label">Storage (GB)<input type="number" min="1" max="2048" required value={storageGb} onChange={(event) => setStorageGb(event.target.value)} /></label>
             <label className="admin-label">Price (ETB)<input type="number" min="1" step="0.01" required value={price} onChange={(event) => setPrice(event.target.value)} /></label>
+          </>}
+          {variant && <>
+            <label className="admin-label">Quantity in stock<input type="number" min="0" required value={stockCount} onChange={(event) => setStockCount(event.target.value)} /></label>
             <label className="admin-label">Low-stock threshold<input type="number" min="0" required value={threshold} onChange={(event) => setThreshold(event.target.value)} /></label>
-            <label className="admin-check"><input type="checkbox" checked={published} onChange={(event) => setPublished(event.target.checked)} /> Publish this variant</label>
-            {specsUnconfirmed && <label className="admin-check full"><input type="checkbox" checked={confirmSpecs} onChange={(event) => setConfirmSpecs(event.target.checked)} /> I have checked this phone’s specifications and they are correct.</label>}
           </>}
           {unit && <>
-            <label className="admin-label">Price (ETB)<input type="number" min="1" step="0.01" required value={price} onChange={(event) => setPrice(event.target.value)} /></label>
-            <label className="admin-check"><input type="checkbox" checked={published} onChange={(event) => setPublished(event.target.checked)} /> Publish this used unit</label>
-            {specsUnconfirmed && <label className="admin-check full"><input type="checkbox" checked={confirmSpecs} onChange={(event) => setConfirmSpecs(event.target.checked)} /> I have checked this phone’s specifications and they are correct.</label>}
+            <label className="admin-label">Condition grade<select value={grade} onChange={(event) => setGrade(event.target.value)}><option value="A">A · excellent</option><option value="B">B · good</option><option value="C">C · fair</option></select></label>
+            <label className="admin-label">Battery health (%)<input type="number" min="1" max="100" value={battery} onChange={(event) => setBattery(event.target.value)} /></label>
+            <label className="admin-label">Accessories<input maxLength={200} value={accessories} onChange={(event) => setAccessories(event.target.value)} /></label>
+            <label className="admin-label">Warranty (months)<input type="number" min="0" max="120" required value={warranty} onChange={(event) => setWarranty(event.target.value)} /></label>
             {role === 'owner' && <>
               <label className="admin-label">Cost price<input type="number" min="0" step="0.01" value={costPrice} onChange={(event) => setCostPrice(event.target.value)} /></label>
               <label className="admin-label">IMEI<input inputMode="numeric" pattern="[0-9]{14,16}" value={imei} onChange={(event) => setImei(event.target.value)} /></label>
               <label className="admin-label full">Internal notes<input value={notes} onChange={(event) => setNotes(event.target.value)} /></label>
             </>}
           </>}
-          {model && <>
+          {target.type === 'model' && <>
             <label className="admin-label">Expected date<input value={expectedDate} onChange={(event) => setExpectedDate(event.target.value)} /></label>
             <label className="admin-label">Expected price range<input value={expectedPriceRange} onChange={(event) => setExpectedPriceRange(event.target.value)} /></label>
-            <label className="admin-label full">Specifications<textarea value={specs} onChange={(event) => setSpecs(event.target.value)} spellCheck={false} /></label>
-            <label className="admin-check full"><input type="checkbox" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} /> I have reviewed and confirmed this model’s specifications.</label>
           </>}
+          {model ? <>
+            <p className="admin-inline-note full">The specifications below belong to the phone model, so a change shows on every colour and storage of it.</p>
+            <SpecFields value={specForm} onChange={setSpecForm} />
+            {model.specs_reviewed
+              ? <p className="admin-inline-note full">These specifications are confirmed. Your changes keep them confirmed.</p>
+              : <label className="admin-check full"><input type="checkbox" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} /> These specifications look right.</label>}
+          </> : <p className="admin-inline-note full">The specifications for this phone could not be loaded. Refresh the page and try again.</p>}
+          {(variant || unit) && <label className="admin-check full"><input type="checkbox" checked={published} onChange={(event) => setPublished(event.target.checked)} /> {variant ? 'Publish this variant' : 'Publish this used phone'}</label>}
         </div>
         {error && <div className="admin-error" role="alert">{error}</div>}
         <div className="admin-form-actions"><button className="button button-outline button-small" type="button" onClick={onClose}>Cancel</button><button className="button button-primary button-small" type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</button></div>

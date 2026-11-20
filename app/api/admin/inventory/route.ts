@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireAdmin } from '../../../../src/lib/auth/session'
 import { colorHex, splitColors } from '../../../../src/lib/colors'
+import { modelSlug } from '../../../../src/lib/format'
 
 const commonSchema = z.object({
   brand: z.string().trim().min(1).max(80),
@@ -84,6 +85,10 @@ export async function POST(request: Request) {
     if (input.kind === 'used' && profile.role !== 'owner' && (input.unit?.costPrice !== undefined || input.unit?.imei || input.unit?.notesInternal)) {
       return NextResponse.json({ error: 'Only the owner can set cost price, IMEI or internal notes.' }, { status: 403 })
     }
+    // "xiaomi" and "Xiaomi" are the same brand: reuse the saved spelling instead of failing on a second brand with the same address.
+    const { data: knownBrand, error: brandError } = await db.from('brands').select('name').ilike('name', input.brand.replace(/[\\%_]/g, '\\$&')).limit(1).maybeSingle()
+    if (brandError) return NextResponse.json({ error: brandError.message }, { status: 500 })
+    if (knownBrand?.name) input.brand = knownBrand.name
     const variantRows = (modelId: string, names: string[], published: boolean) => names.map((name) => ({
       model_id: modelId, ram_gb: input.variant!.ramGb, storage_gb: input.variant!.storageGb, color_name: name, color_hex: colorHex(name),
       price: input.variant!.price, old_price: input.variant!.oldPrice ?? null, stock_count: input.variant!.stockCount,
@@ -133,9 +138,9 @@ export async function POST(request: Request) {
 }
 
 const updateSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('variant'), id: z.string().uuid(), colorName: z.string().trim().min(1).max(50).optional(), confirmSpecs: z.boolean().optional(), stockCount: z.number().int().min(0).optional(), price: z.number().positive().optional(), lowStockThreshold: z.number().int().min(0).optional(), isPublished: z.boolean().optional() }).strict(),
-  z.object({ type: z.literal('unit'), id: z.string().uuid(), confirmSpecs: z.boolean().optional(), price: z.number().positive().optional(), isPublished: z.boolean().optional(), accessories: z.string().max(200).optional(), warrantyMonths: z.number().int().min(0).max(120).optional(), costPrice: z.number().nonnegative().nullable().optional(), imei: z.string().regex(/^\d{14,16}$/).nullable().optional(), notesInternal: z.string().max(2000).optional() }).strict(),
-  z.object({ type: z.literal('model'), id: z.string().uuid(), tagline: z.string().max(240).optional(), expectedDate: z.string().max(80).optional(), expectedPriceRange: z.string().max(80).optional(), specs: z.record(z.string(), z.unknown()).optional(), specMeta: z.record(z.string(), z.unknown()).optional(), specsReviewed: z.boolean().optional() }).strict(),
+  z.object({ type: z.literal('variant'), id: z.string().uuid(), ramGb: z.number().int().min(1).max(24).optional(), storageGb: z.number().int().min(1).max(2048).optional(), colorName: z.string().trim().min(1).max(50).optional(), confirmSpecs: z.boolean().optional(), stockCount: z.number().int().min(0).optional(), price: z.number().positive().optional(), lowStockThreshold: z.number().int().min(0).optional(), isPublished: z.boolean().optional() }).strict(),
+  z.object({ type: z.literal('unit'), id: z.string().uuid(), ramGb: z.number().int().min(1).max(24).optional(), storageGb: z.number().int().min(1).max(2048).optional(), colorName: z.string().trim().min(1).max(50).optional(), grade: z.enum(['A', 'B', 'C']).optional(), batteryHealthPct: z.number().int().min(1).max(100).nullable().optional(), confirmSpecs: z.boolean().optional(), price: z.number().positive().optional(), isPublished: z.boolean().optional(), accessories: z.string().max(200).optional(), warrantyMonths: z.number().int().min(0).max(120).optional(), costPrice: z.number().nonnegative().nullable().optional(), imei: z.string().regex(/^\d{14,16}$/).nullable().optional(), notesInternal: z.string().max(2000).optional() }).strict(),
+  z.object({ type: z.literal('model'), id: z.string().uuid(), name: z.string().trim().min(1).max(120).optional(), tagline: z.string().max(240).optional(), expectedDate: z.string().max(80).optional(), expectedPriceRange: z.string().max(80).optional(), specs: z.record(z.string(), z.unknown()).optional(), specMeta: z.record(z.string(), z.unknown()).optional(), specsReviewed: z.boolean().optional() }).strict(),
 ])
 
 const deleteSchema = z.object({ type: z.enum(['model', 'variant', 'unit']), id: z.string().uuid() }).strict()
@@ -161,7 +166,7 @@ export async function PATCH(request: Request) {
     }
     let error: { message: string } | null
     if (input.type === 'variant') {
-      const values = { ...(input.stockCount !== undefined ? { stock_count: input.stockCount } : {}), ...(input.price !== undefined ? { price: input.price } : {}), ...(input.lowStockThreshold !== undefined ? { low_stock_threshold: input.lowStockThreshold } : {}), ...(input.isPublished !== undefined ? { is_published: input.isPublished } : {}), ...(input.colorName !== undefined ? { color_name: input.colorName, color_hex: colorHex(input.colorName) } : {}) }
+      const values = { ...(input.stockCount !== undefined ? { stock_count: input.stockCount } : {}), ...(input.price !== undefined ? { price: input.price } : {}), ...(input.lowStockThreshold !== undefined ? { low_stock_threshold: input.lowStockThreshold } : {}), ...(input.isPublished !== undefined ? { is_published: input.isPublished } : {}), ...(input.colorName !== undefined ? { color_name: input.colorName, color_hex: colorHex(input.colorName) } : {}), ...(input.ramGb !== undefined ? { ram_gb: input.ramGb } : {}), ...(input.storageGb !== undefined ? { storage_gb: input.storageGb } : {}) }
       if (!Object.keys(values).length && !input.confirmSpecs) return NextResponse.json({ error: 'No changes provided.' }, { status: 400 })
       if (input.confirmSpecs) {
         const confirmed = await confirmModelSpecs(db, 'variants', input.id)
@@ -171,7 +176,7 @@ export async function PATCH(request: Request) {
       else error = null
       if (error?.message.includes('duplicate')) error = { message: 'Another variant of this phone already has that colour, RAM and storage.' }
     } else if (input.type === 'unit') {
-      const values = { ...(input.price !== undefined ? { price: input.price } : {}), ...(input.isPublished !== undefined ? { is_published: input.isPublished } : {}), ...(input.accessories !== undefined ? { accessories: input.accessories } : {}), ...(input.warrantyMonths !== undefined ? { warranty_months: input.warrantyMonths } : {}), ...(input.costPrice !== undefined ? { cost_price: input.costPrice } : {}), ...(input.imei !== undefined ? { imei: input.imei } : {}), ...(input.notesInternal !== undefined ? { notes_internal: input.notesInternal } : {}) }
+      const values = { ...(input.price !== undefined ? { price: input.price } : {}), ...(input.isPublished !== undefined ? { is_published: input.isPublished } : {}), ...(input.accessories !== undefined ? { accessories: input.accessories } : {}), ...(input.warrantyMonths !== undefined ? { warranty_months: input.warrantyMonths } : {}), ...(input.costPrice !== undefined ? { cost_price: input.costPrice } : {}), ...(input.imei !== undefined ? { imei: input.imei } : {}), ...(input.notesInternal !== undefined ? { notes_internal: input.notesInternal } : {}), ...(input.ramGb !== undefined ? { ram_gb: input.ramGb } : {}), ...(input.storageGb !== undefined ? { storage_gb: input.storageGb } : {}), ...(input.colorName !== undefined ? { color_name: input.colorName } : {}), ...(input.grade !== undefined ? { grade: input.grade } : {}), ...(input.batteryHealthPct !== undefined ? { battery_health_pct: input.batteryHealthPct } : {}) }
       if (!Object.keys(values).length && !input.confirmSpecs) return NextResponse.json({ error: 'No changes provided.' }, { status: 400 })
       if (input.confirmSpecs) {
         const confirmed = await confirmModelSpecs(db, 'used_units', input.id)
@@ -181,8 +186,26 @@ export async function PATCH(request: Request) {
       else error = null
     } else {
       const values = { ...(input.tagline !== undefined ? { tagline: input.tagline } : {}), ...(input.expectedDate !== undefined ? { expected_date: input.expectedDate } : {}), ...(input.expectedPriceRange !== undefined ? { expected_price_range: input.expectedPriceRange } : {}), ...(input.specs !== undefined ? { specs: input.specs } : {}), ...(input.specMeta !== undefined ? { spec_meta: input.specMeta } : {}), ...(input.specsReviewed !== undefined ? { specs_reviewed: input.specsReviewed } : {}) }
-      if (!Object.keys(values).length) return NextResponse.json({ error: 'No changes provided.' }, { status: 400 })
-      ;({ error } = await db.from('phone_models').update(values).eq('id', input.id))
+      // The shop hides every colour and storage of a phone whose specifications are not confirmed, so a confirmation is never taken back here.
+      if (input.specsReviewed === false) {
+        const { data: current, error: lookupError } = await db.from('phone_models').select('specs_reviewed').eq('id', input.id).maybeSingle()
+        if (lookupError) return NextResponse.json({ error: lookupError.message }, { status: 500 })
+        if (current?.specs_reviewed) return NextResponse.json({ error: 'These specifications are already confirmed. To take the phone off the shop, untick Publish instead.' }, { status: 400 })
+      }
+      let renamed: { name: string; slug: string } | Record<string, never> = {}
+      if (input.name !== undefined) {
+        if (!/[a-z0-9]/i.test(input.name)) return NextResponse.json({ error: 'Use English letters or numbers in the model name; it also makes the phone page address.' }, { status: 400 })
+        // Renaming also moves the phone page address, so a later "Add phone" with the new name finds this model.
+        const { data: current, error: lookupError } = await db.from('phone_models').select('name,brands(name)').eq('id', input.id).maybeSingle()
+        if (lookupError || !current) return NextResponse.json({ error: lookupError?.message ?? 'That phone no longer exists.' }, { status: 400 })
+        const brand = Array.isArray(current.brands) ? current.brands[0]?.name : current.brands?.name
+        if (input.name !== current.name) renamed = { name: input.name, slug: modelSlug(brand ?? '', input.name) }
+      }
+      const allValues = { ...values, ...renamed }
+      // A name that is already saved is not an error: it happens when a save is retried after the stock line failed.
+      if (!Object.keys(allValues).length) return input.name !== undefined ? NextResponse.json({ ok: true }) : NextResponse.json({ error: 'No changes provided.' }, { status: 400 })
+      ;({ error } = await db.from('phone_models').update(allValues).eq('id', input.id))
+      if (error?.message.includes('duplicate')) error = { message: 'Another phone already has that name.' }
     }
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json({ ok: true })

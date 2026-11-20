@@ -43,10 +43,10 @@ export default async function AdminDashboard() {
       <Link className="button button-primary" href="/admin/inventory">Manage inventory <ArrowRight size={16} /></Link>
     </div>
     <section className="admin-stat-grid" aria-label="Store overview">
-      <article className="admin-stat"><div className="admin-stat-head">Phone models</div><strong className="admin-stat-value">{models.count ?? 0}</strong><span className="admin-stat-note">Models in your catalog</span></article>
-      <article className="admin-stat"><div className="admin-stat-head">Stock items</div><strong className="admin-stat-value">{(variants.count ?? 0) + (units.count ?? 0)}</strong><span className="admin-stat-note">New variants and used phones</span></article>
-      <article className="admin-stat"><div className="admin-stat-head">New requests</div><strong className="admin-stat-value">{leads.count ?? 0}</strong><span className="admin-stat-note">Waiting for a response</span></article>
-      <article className="admin-stat"><div className="admin-stat-head">Sales · 7 days</div><strong className="admin-stat-value">{money(weekRevenue)}</strong><span className="admin-stat-note">{sales.data?.length ?? 0} recorded transactions</span></article>
+      <Link className="admin-stat" href="/admin/inventory"><div className="admin-stat-head">Phone models</div><strong className="admin-stat-value">{models.count ?? 0}</strong><span className="admin-stat-note">Models in your catalog</span></Link>
+      <Link className="admin-stat" href="/admin/inventory"><div className="admin-stat-head">Stock items</div><strong className="admin-stat-value">{(variants.count ?? 0) + (units.count ?? 0)}</strong><span className="admin-stat-note">New variants and used phones</span></Link>
+      <Link className="admin-stat" href="/admin/leads"><div className="admin-stat-head">New requests</div><strong className="admin-stat-value">{leads.count ?? 0}</strong><span className="admin-stat-note">Waiting for a response</span></Link>
+      <Link className="admin-stat" href="/admin/sales"><div className="admin-stat-head">Sales · 7 days</div><strong className="admin-stat-value">{money(weekRevenue)}</strong><span className="admin-stat-note">{sales.data?.length ?? 0} recorded transactions</span></Link>
     </section>
     <section className="admin-dashboard-grid">
       <article className="admin-card">

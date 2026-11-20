@@ -28,3 +28,7 @@ export function openingHoursForSearch(text: string): string | undefined {
 /** "Honor" + "Honor 400" reads as "Honor 400", not "Honor Honor 400". */
 export const fullPhoneName = (brand: string, model: string) =>
   model.trim().toLowerCase().startsWith(brand.trim().toLowerCase()) ? model.trim() : `${brand.trim()} ${model.trim()}`
+
+/** The phone page address for a brand and model, e.g. "samsung-galaxy-s25". */
+export const modelSlug = (brand: string, model: string) =>
+  `${brand}-${model}`.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')

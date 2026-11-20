@@ -22,4 +22,4 @@
 - Forgotten passwords are reset by the owner (sellers, in Settings) or from the server Terminal (the owner). There is no email reset.
 - Sign-in allows 8 wrong passwords per email and 30 per network address in 15 minutes, and 8 wrong codes per account, before pausing.
 - The repository migration includes a trigger (`phone_models_review_gate`) that refuses to save an "available" phone whose specifications are unconfirmed. Your live database does not enforce it (the first 13 phones were saved unconfirmed). If you re-create the database from the migration, saving a draft phone from the Add form will be rejected until the specifications are confirmed; tick the confirmation box in step 2.
-- Existing phones can be given a colour, and their specifications confirmed, from the pencil (Edit) button on their inventory row.
+- Everything entered when a phone was added (model name, colour, RAM, storage, price, stock and every specification) can be changed later from the pencil (Edit) button on its inventory row, by the owner or a seller. Sellers still cannot see or change cost price, IMEI or internal notes. Brand cannot be changed; add the phone again under the right brand.

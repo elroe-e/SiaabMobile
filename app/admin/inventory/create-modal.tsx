@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { splitColors } from '../../../src/lib/colors'
+import { modelSlug } from '../../../src/lib/format'
+import { BrandPicker, canonicalBrand } from './brand-picker'
 import { isPhotoFile, preparePhoto, uploadPhoto } from './photo-tools'
 
 type Role = 'owner' | 'staff'
@@ -49,6 +51,7 @@ export function CreateInventoryModal({ role, onClose, onCreate, onFinished }: {
   const [colors, setColors] = useState('')
   const [ramGb, setRamGb] = useState('8')
   const [storageGb, setStorageGb] = useState('128')
+  const [batteryMah, setBatteryMah] = useState('')
   const [price, setPrice] = useState('')
   const [stockCount, setStockCount] = useState('1')
   const [expectedDate, setExpectedDate] = useState('')
@@ -70,24 +73,31 @@ export function CreateInventoryModal({ role, onClose, onCreate, onFinished }: {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  const slug = useMemo(() => `${brand}-${model}`.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''), [brand, model])
+  const slug = useMemo(() => modelSlug(brand, model), [brand, model])
   const needsColor = kind !== 'upcoming'
 
-  const withEntered = (base: Specs): Specs => ({
-    ...base,
-    ...(kind !== 'upcoming' && num(base.ramGb) === null && Number(ramGb) ? { ramGb: Number(ramGb) } : {}),
-    ...(kind !== 'upcoming' && num(base.storageGb) === null && Number(storageGb) ? { storageGb: Number(storageGb) } : {}),
+  /** What the person typed in step 1. The online lookup (Gemini, Wikipedia…) never replaces these. */
+  const entered = (): Specs => ({
+    ...(kind !== 'upcoming' && Number(ramGb) > 0 ? { ramGb: Number(ramGb) } : {}),
+    ...(kind !== 'upcoming' && Number(storageGb) > 0 ? { storageGb: Number(storageGb) } : {}),
+    ...(Number(batteryMah) > 0 ? { batteryMah: Number(batteryMah) } : {}),
   })
+  const withEntered = (base: Specs): Specs => ({ ...base, ...entered() })
+  /** Marks the typed values as set by hand, so a later lookup for this phone leaves them alone too. */
+  const lockEntered = (meta: Record<string, unknown>) => {
+    const updatedAt = new Date().toISOString()
+    return { ...meta, ...Object.fromEntries(Object.keys(entered()).map((key) => [key, { source: 'manual', status: 'edited', locked: true, updatedAt }])) }
+  }
 
   const lookup = async (withPasted = false) => {
     setLookupBusy(true); setLookupError('')
     try {
-      const response = await fetch('/api/admin/specs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ brand: brand.trim(), model: model.trim(), ...(withPasted && pastedText.trim() ? { pastedText } : {}) }) })
+      const response = await fetch('/api/admin/specs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ brand: canonicalBrand(brand), model: model.trim(), ...(withPasted && pastedText.trim() ? { pastedText } : {}) }) })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error ?? 'Specification lookup failed.')
       const merged = withEntered((result.specs ?? {}) as Specs)
       setSpecs(merged); setJsonText(JSON.stringify(merged, null, 2))
-      setSpecMeta((result.metadata ?? {}) as Record<string, unknown>)
+      setSpecMeta(lockEntered((result.metadata ?? {}) as Record<string, unknown>))
       setProviders((result.providers ?? []) as ProviderInfo[])
     } catch (cause) {
       const merged = withEntered(specs)
@@ -112,12 +122,12 @@ export function CreateInventoryModal({ role, onClose, onCreate, onFinished }: {
   const save = async () => {
     setBusy(true); setError('')
     let finalSpecs: Specs
-    try { finalSpecs = JSON.parse(jsonText) as Specs } catch { setBusy(false); setError('The specification text is not valid JSON.'); return }
+    try { finalSpecs = withEntered(JSON.parse(jsonText) as Specs) } catch { setBusy(false); setError('The specification text is not valid JSON.'); return }
     const body: Record<string, unknown> = {
-      kind, brand: brand.trim(), model: model.trim(), slug,
+      kind, brand: canonicalBrand(brand), model: model.trim(), slug,
       status: kind === 'upcoming' ? 'upcoming' : 'available',
       ...(kind === 'upcoming' ? { expectedDate, expectedPriceRange } : {}),
-      specs: finalSpecs, specMeta, specsReviewed: reviewed, isPublished: reviewed && publish,
+      specs: finalSpecs, specMeta: lockEntered(specMeta), specsReviewed: reviewed, isPublished: reviewed && publish,
       ...(kind === 'new' ? { variant: { ramGb: Number(ramGb), storageGb: Number(storageGb), colorName: colors.trim(), price: Number(price), stockCount: Number(stockCount), lowStockThreshold: 2 } } : {}),
       ...(kind === 'used' ? { unit: { ramGb: Number(ramGb), storageGb: Number(storageGb), colorName: colors.trim(), grade: used.grade, batteryHealthPct: Number(used.batteryHealthPct), accessories: used.accessories, warrantyMonths: Number(used.warrantyMonths), price: Number(price), ...(used.costPrice ? { costPrice: Number(used.costPrice) } : {}), ...(used.imei ? { imei: used.imei } : {}), notesInternal: used.notesInternal } } : {}),
     }
@@ -159,7 +169,7 @@ export function CreateInventoryModal({ role, onClose, onCreate, onFinished }: {
       {step === 1 && <form onSubmit={(event) => void goNext(event)}>
         <div className="admin-form-grid">
           <label className="admin-label full">Type<select value={kind} onChange={(event) => setKind(event.target.value as Kind)}><option value="new">New phone</option><option value="used">Used phone (one unit)</option><option value="upcoming">Upcoming model</option></select></label>
-          <label className="admin-label">Brand<input required maxLength={80} value={brand} onChange={(event) => setBrand(event.target.value)} placeholder="Samsung" autoComplete="off" /></label>
+          <BrandPicker value={brand} onChange={setBrand} />
           <label className="admin-label">Model<input required maxLength={120} value={model} onChange={(event) => setModel(event.target.value)} placeholder="Galaxy S25 Ultra" autoComplete="off" /></label>
           {needsColor && <label className="admin-label full">Colour<input required maxLength={120} value={colors} onChange={(event) => setColors(event.target.value)} placeholder="Black, Blue" /><small className="admin-inline-note">Customers see these colours but cannot pick one. Separate several with commas; each gets the same quantity.</small></label>}
           {kind !== 'upcoming' && <>
@@ -172,6 +182,7 @@ export function CreateInventoryModal({ role, onClose, onCreate, onFinished }: {
             <label className="admin-label">Expected date<input required value={expectedDate} onChange={(event) => setExpectedDate(event.target.value)} placeholder="Expected Q4 2026" /></label>
             <label className="admin-label">Expected price range<input value={expectedPriceRange} onChange={(event) => setExpectedPriceRange(event.target.value)} placeholder="ETB 90,000 – 110,000" /></label>
           </>}
+          <label className="admin-label">Battery (mAh)<input type="number" min="500" max="30000" value={batteryMah} onChange={(event) => setBatteryMah(event.target.value)} placeholder="5000" /><small className="admin-inline-note">Leave empty to let the lookup suggest it.</small></label>
           {kind === 'used' && <>
             <label className="admin-label">Condition grade<select value={used.grade} onChange={(event) => setUsed({ ...used, grade: event.target.value })}><option value="A">A · excellent</option><option value="B">B · good</option><option value="C">C · fair</option></select></label>
             <label className="admin-label">Battery health (%)<input type="number" min="1" max="100" value={used.batteryHealthPct} onChange={(event) => setUsed({ ...used, batteryHealthPct: event.target.value })} /></label>
@@ -199,6 +210,7 @@ export function CreateInventoryModal({ role, onClose, onCreate, onFinished }: {
           <div className="admin-label full">
             <span>{brand} {model}</span>
             {lookupBusy && <p className="admin-inline-note" role="status">Looking up specifications online…</p>}
+            <p className="admin-inline-note">{kind === 'upcoming' ? 'Battery' : 'Colour, RAM, storage and battery'} are kept as you entered them in step 1{batteryMah ? '' : ' (battery only if you entered one)'}; the online search never changes them. Use Back to change them.</p>
             {!lookupBusy && rows.length > 0 && <dl className="admin-spec-list">{rows.map(([name, value]) => <div key={name}><dt>{name}</dt><dd>{value}</dd></div>)}</dl>}
             {!lookupBusy && rows.length === 0 && <p className="admin-inline-note">No specifications were found online for this phone yet. You can paste them below, or save and customers will see "Not specified".</p>}
             {providers.length > 0 && <p className="admin-inline-note">{providers.map((provider) => `${providerLabel[provider.name] ?? provider.name}: ${provider.status === 'ok' || provider.foundFields > 0 ? `${provider.foundFields} found` : provider.status}`).join(' · ')}</p>}

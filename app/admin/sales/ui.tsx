@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { RotateCcw } from 'lucide-react'
+import { PackagePlus, RotateCcw } from 'lucide-react'
 import { SalesTrend } from '../sales-trend'
 
 type Role = 'owner' | 'staff'
@@ -83,6 +83,23 @@ export function SalesManager({ role }: { role: Role }) {
     else { setNotice('Sale undone and inventory restored.'); await load() }
   }
 
+  /** Puts the same phone back on sale: more stock for a new phone, or a new copy of a sold used phone. The sale stays recorded. */
+  const restock = async (sale: Sale) => {
+    const name = modelName(sale.kind === 'new' ? sale.variants?.phone_models ?? null : sale.used_units?.phone_models ?? null)
+    let quantity = 1
+    if (sale.kind === 'new') {
+      const answer = window.prompt(`How many ${name} to add back to stock? Same colour, RAM, storage and price.`, '1')
+      if (answer === null) return
+      quantity = Number(answer)
+      if (!Number.isInteger(quantity) || quantity < 1 || quantity > 1000) { setError('Enter a whole number from 1 to 1000.'); return }
+    } else if (!window.confirm(`Add another used ${name} with the same colour, RAM, storage, grade, battery, accessories, warranty and price? IMEI, cost and notes are left empty for you to fill in from Inventory.`)) return
+    setError(''); setNotice('')
+    const response = await fetch('/api/admin/sales', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'restock', id: sale.id, quantity }) })
+    const result = await response.json()
+    if (!response.ok) setError(result.error ?? 'Could not restock.')
+    else { setNotice(sale.kind === 'new' ? `Added ${quantity} ${name} back to stock.` : `Added another used ${name} to Inventory. Check its details there.`); await load() }
+  }
+
   const weekTotal = sales.filter((sale) => !sale.undone_at && Date.now() - Date.parse(sale.sold_at) <= 7 * 86400000).reduce((sum, sale) => sum + Number(sale.sale_price), 0)
   const monthTotal = sales.filter((sale) => !sale.undone_at && Date.now() - Date.parse(sale.sold_at) <= 30 * 86400000).reduce((sum, sale) => sum + Number(sale.sale_price), 0)
 
@@ -102,7 +119,7 @@ export function SalesManager({ role }: { role: Role }) {
       {loading ? <div className="admin-empty">Loading sales…</div> : !filteredSales.length ? <div className="admin-empty">No sales recorded yet.</div> : <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Phone</th><th>Type</th><th>Quantity</th><th>Sale price</th>{role === 'owner' && <th>Cost / margin</th>}<th>Sold at</th><th>Status</th><th>Action</th></tr></thead><tbody>{filteredSales.map((sale) => {
         const model = sale.kind === 'new' ? sale.variants?.phone_models ?? null : sale.used_units?.phone_models ?? null
         const canUndo = role === 'owner' || Date.now() - Date.parse(sale.sold_at) < 24 * 60 * 60 * 1000
-        return <tr key={sale.id}><td><strong>{modelName(model)}</strong>{sale.buyer_note && <small>{sale.buyer_note}</small>}</td><td><span className={`admin-badge ${sale.kind === 'new' ? 'green' : 'amber'}`}>{sale.kind}</span></td><td>{sale.quantity}</td><td>{money(sale.sale_price)}</td>{role === 'owner' && <td>{sale.cost_price == null ? '—' : <><strong>{money(sale.cost_price)}</strong><small>Margin {money(Number(sale.sale_price) - Number(sale.cost_price))}</small></>}</td>}<td>{new Date(sale.sold_at).toLocaleString()}</td><td><span className={`admin-badge ${sale.undone_at ? 'gray' : 'green'}`}>{sale.undone_at ? 'Undone' : 'Complete'}</span></td><td>{!sale.undone_at && canUndo && <button className="admin-icon-button" title="Undo sale" onClick={() => void undo(sale)}><RotateCcw size={16} /></button>}</td></tr>
+        return <tr key={sale.id}><td><strong>{modelName(model)}</strong>{sale.buyer_note && <small>{sale.buyer_note}</small>}</td><td><span className={`admin-badge ${sale.kind === 'new' ? 'green' : 'amber'}`}>{sale.kind}</span></td><td>{sale.quantity}</td><td>{money(sale.sale_price)}</td>{role === 'owner' && <td>{sale.cost_price == null ? '—' : <><strong>{money(sale.cost_price)}</strong><small>Margin {money(Number(sale.sale_price) - Number(sale.cost_price))}</small></>}</td>}<td>{new Date(sale.sold_at).toLocaleString()}</td><td><span className={`admin-badge ${sale.undone_at ? 'gray' : 'green'}`}>{sale.undone_at ? 'Undone' : 'Complete'}</span></td><td><div className="admin-table-actions"><button className="admin-icon-button" title="Restock: add the same phone again" aria-label={`Restock ${modelName(model)}`} onClick={() => void restock(sale)}><PackagePlus size={16} /></button>{!sale.undone_at && canUndo && <button className="admin-icon-button" title="Undo sale" aria-label={`Undo sale of ${modelName(model)}`} onClick={() => void undo(sale)}><RotateCcw size={16} /></button>}</div></td></tr>
       })}</tbody></table></div>}
     </article>
   </section>

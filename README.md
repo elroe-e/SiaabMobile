@@ -62,6 +62,7 @@ Tests run the real schema in an in-memory PostgreSQL ([PGlite](https://pglite.de
 - **Overview:** stock warnings, recent customer requests and sales totals.
 - **Inventory:** add new variants, individual used units and upcoming models; review/edit specs; adjust prices, stock and visibility; upload/reorder/delete optimized photos; reserve used units for 1–14 days.
 - **Sales:** record a transaction atomically with its stock update; eligible staff may undo recent sales, and owners can undo older sales.
+- **Restock:** the box icon on any Sale history row puts the same phone back on sale without retyping it. For a new phone it asks how many and adds them to the same colour, RAM, storage and price. For a used phone it adds one new used phone copied from the sold one (colour, RAM, storage, grade, battery, accessories, warranty, price and visibility); IMEI, cost price, notes and photos are not copied, so add them from Inventory. The sale itself stays recorded. Owners and sellers can restock.
 - **Leads:** triage trade-in, contact and notify-me requests, save internal notes, and contact customers by phone or WhatsApp.
 - **Owner-only settings:** shop details, sold badge period, low-stock threshold, trade-in rules/base values, private used-unit cost/IMEI/notes, audit history and full ZIP export.
 
@@ -111,10 +112,20 @@ All sample prices, stock, warranties, device details, trade-in values, upcoming 
 
 Admin → Inventory → **Add inventory** opens a two-step form.
 
-1. **Phone details:** type, brand, model, colour(s), RAM, storage, price, quantity and photos. For several colours write them with commas (for example `Black, Blue`); each colour gets its own stock line with the same quantity. Customers see the colours but cannot choose one. If the model already exists, the form adds the new colour or storage to it instead of creating a duplicate.
+1. **Phone details:** type, brand (pick from the list with the arrow on the left, or type: the first letters suggest a match, Enter or a tap takes it, and any other brand can still be typed), model, colour(s), RAM, storage, battery (optional), price, quantity and photos. The colour, RAM, storage and battery typed here always win: the automatic lookup (Gemini, Wikipedia, saved library) never replaces them, and they are marked as set by hand so later lookups leave them alone. Leave battery empty to let the lookup suggest it. For several colours write them with commas (for example `Black, Blue`); each colour gets its own stock line with the same quantity. Customers see the colours but cannot choose one. If the model already exists, the form adds the new colour or storage to it instead of creating a duplicate.
 2. **Specifications:** the app looks up the remaining specifications automatically (saved library, Wikipedia, then the optional Google AI source). Review the list, tick **These specifications look right** and the phone is published. Without that tick it is saved as a draft and stays hidden. If nothing is found you can paste specifications copied from any website, or save and customers see "Not specified".
 
 Photos chosen in step 1 are shrunk to WebP (under 200 KB) and uploaded as soon as the phone is saved. The first photo is the main one.
+
+### Editing a phone later
+
+The pencil (Edit) button on any inventory row opens everything that was entered when the phone was added: model name, colour, RAM, storage, price and stock (or grade, battery, accessories and warranty for a used phone), and every specification as its own box. It works for drafts and published phones, and for the owner and sellers alike; each change is recorded in Activity.
+
+- Specifications and the model name belong to the phone model, so a change shows on every colour and storage of it.
+- A new model name also changes the phone's web address; links shared earlier stop working.
+- Specifications changed by hand are marked as edited, so a later automatic lookup does not overwrite them.
+- A phone can only be published once **These specifications look right** is ticked. After that the specifications stay confirmed (un-confirming would hide every colour of the phone); to take a phone off the shop, untick **Publish**.
+- Only boxes you change are checked and saved; everything else stays exactly as it was stored.
 
 ### Free spec lookup for brand-new phones
 
