@@ -1,5 +1,7 @@
 'use client'
 
+import { useState } from 'react'
+
 type Specs = Record<string, unknown>
 type YesNo = '' | 'yes' | 'no'
 type CameraRow = { name: string; megapixels: string; details: string }
@@ -127,7 +129,15 @@ export function editedMeta(before: Specs, after: Specs, meta: Specs): Specs {
   return next
 }
 
+const ADVANCED_BOXES: (keyof SpecForm)[] = ['resWidth', 'resHeight', 'displayType', 'brightnessNits', 'protection', 'cpu', 'gpu', 'os', 'frontMp', 'frontDetails', 'fiveG', 'nfc', 'esim', 'height', 'width', 'depth', 'weightGrams', 'waterRating']
+
+/** True when a box that only the Advanced view shows has something in it. */
+export const formHasAdvanced = (form: SpecForm) =>
+  ADVANCED_BOXES.some((key) => String(form[key]).trim() !== '') || form.rear.slice(1).some((camera) => camera.megapixels.trim()) || form.rear.some((camera) => camera.details.trim())
+
 export function SpecFields({ value, onChange }: { value: SpecForm; onChange: (next: SpecForm) => void }) {
+  // Simple shows the few specs most owners know; Advanced shows every box. Opens on Advanced when advanced specs are already filled in, so nothing is published unseen.
+  const [advanced, setAdvanced] = useState(() => formHasAdvanced(value))
   const set = (key: keyof SpecForm) => (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => onChange({ ...value, [key]: event.target.value })
   // No example text inside the boxes: grey examples were mistaken for found specifications.
   const field = (label: string, key: keyof SpecForm, numeric = false) =>
@@ -136,7 +146,29 @@ export function SpecFields({ value, onChange }: { value: SpecForm; onChange: (ne
     <label className="admin-label">{label}<select value={value[key]} onChange={set(key)}><option value="">Not known</option><option value="yes">Yes</option><option value="no">No</option></select></label>
   const setCamera = (index: number, key: keyof CameraRow, text: string) => onChange({ ...value, rear: value.rear.map((camera, at) => at === index ? { ...camera, [key]: text } : camera) })
 
+  const mainCamera = (text: string) => onChange({ ...value, rear: value.rear.length ? value.rear.map((camera, at) => at === 0 ? { ...camera, megapixels: text } : camera) : [{ ...emptyCamera(), megapixels: text }] })
+  const switcher = <div className="admin-spec-mode full">
+    <div className="admin-segmented" role="radiogroup" aria-label="How many specifications to show">
+      {([false, true] as const).map((option) => <button key={String(option)} type="button" role="radio" aria-checked={advanced === option} onClick={() => setAdvanced(option)}>{option ? 'Advanced (all specifications)' : 'Simple'}</button>)}
+    </div>
+    <p className="admin-inline-note">{advanced
+      ? 'Every specification. Customers see an Advanced button on the shop when any of the extra boxes is filled in.'
+      : 'Just the main specifications. Customers see these on the shop; anything already filled in under Advanced is kept.'}</p>
+  </div>
+
+  if (!advanced) return <>
+    {switcher}
+    {field('Screen size (inches)', 'sizeInches', true)}
+    {field('Refresh rate (Hz)', 'refreshRateHz', true)}
+    {field('Chipset (processor)', 'chipset')}
+    <label className="admin-label">Main camera (megapixels)<input value={value.rear[0]?.megapixels ?? ''} onChange={(event) => mainCamera(event.target.value)} inputMode="decimal" /></label>
+    {field('Battery (mAh)', 'batteryMah', true)}
+    {field('Charging (watts)', 'chargingWatts', true)}
+    <p className="admin-inline-note full">Leave a box empty if you don’t know it. Customers then see “Not specified”.</p>
+  </>
+
   return <>
+    {switcher}
     <h3 className="admin-form-heading full">Screen</h3>
     {field('Size (inches)', 'sizeInches', true)}
     {field('Type', 'displayType')}

@@ -30,7 +30,7 @@ async function fillBasics(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/^Price/), '99000')
 }
 
-const specsShown = async (chipset = 'Snapdragon 8 Elite') => expect(await screen.findByLabelText('Chipset')).toHaveValue(chipset)
+const specsShown = async (chipset = 'Snapdragon 8 Elite') => expect(await screen.findByLabelText(/^Chipset/)).toHaveValue(chipset)
 
 describe('Add phone form', () => {
   it('asks only for the basics, then looks up specifications automatically', async () => {
@@ -108,7 +108,7 @@ describe('Add phone form', () => {
     expect(await screen.findByText('AI lookup is busy')).toBeTruthy()
     expect(screen.getByText(/Kept from step 1: Black, Blue · 12 GB RAM · 256 GB storage\./)).toBeTruthy()
     expect(screen.getByText(/Nothing was found online/)).toBeTruthy()
-    expect(screen.getByLabelText('Chipset')).toHaveValue('')
+    expect(screen.getByLabelText(/^Chipset/)).toHaveValue('')
   })
 })
 
@@ -174,7 +174,7 @@ describe('step 2 fill-in list', () => {
     await user.click(screen.getByText('Paste specifications from a website'))
     fireEvent.change(screen.getByPlaceholderText(/Display: 6.7 inches/), { target: { value: 'Chipset: Dimensity 9400\nBattery: 6000 mAh\nRAM: 16 GB\nCharging: 90W' } })
     await user.click(screen.getByRole('button', { name: 'Fill the boxes from pasted text' }))
-    expect(screen.getByLabelText('Chipset')).toHaveValue('Dimensity 9400')
+    expect(screen.getByLabelText(/^Chipset/)).toHaveValue('Dimensity 9400')
     expect(screen.getByLabelText('Charging (watts)')).toHaveValue('90')
     expect(screen.getByLabelText('Battery (mAh)')).toHaveValue('5500')
     expect(screen.getByLabelText('Water resistance')).toHaveValue('IP68')

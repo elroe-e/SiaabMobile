@@ -1,4 +1,5 @@
 import 'server-only'
+import { advancedSpecGroups, simpleSpecLines } from '../specs/simple-specs'
 import { createDbClient } from './client'
 import { photoUrl } from './photos'
 import { phones as samplePhones, placeholderImages } from '../../data/phones'
@@ -45,34 +46,19 @@ type PublicUsedUnit = {
 }
 type PublicModelPhoto = { model_id: string; path: string; alt_text: string; sort_order: number; is_main: boolean }
 
-const getString = (value: unknown, fallback = 'Not specified') => typeof value === 'string' && value ? value : fallback
-const getNumber = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : undefined
+
+/** Simple specs for a card; unknown values read "Not specified" and are left off the card. */
+function shopSimpleSpecs(specs: Record<string, unknown>, storageGb: number, ramGb: number): Phone['simpleSpecs'] {
+  const lines = simpleSpecLines(specs)
+  const or = (text: string) => text || 'Not specified'
+  return { display: or(lines.display), camera: or(lines.camera), battery: or(lines.battery), storage: `${storageGb} GB`, ram: `${ramGb} GB`, chipset: or(lines.chipset) }
+}
 
 function toPhone(model: PublicModel, variant: PublicVariant, photos: PublicModelPhoto[], modelVariants: Map<string, PublicVariant[]>): Phone {
   const modelPhotos = photos.filter((photo) => photo.model_id === model.id).sort((a, b) => a.sort_order - b.sort_order)
   const storageVariants = modelVariants.get(model.id) ?? [variant]
   const totalStock = storageVariants.reduce((sum, item) => sum + item.stock_count, 0)
-  const camera = Array.isArray(model.specs.rearCamera)
-    ? model.specs.rearCamera.map((item) => {
-      if (typeof item !== 'object' || !item || !('megapixels' in item)) return ''
-      return `${String(item.megapixels)} MP`
-    }).filter(Boolean).join(' + ')
-    : 'Not specified'
-  const display = typeof model.specs.display === 'object' && model.specs.display
-    ? (getNumber((model.specs.display as Record<string, unknown>).sizeInches)
-      ? `${getNumber((model.specs.display as Record<string, unknown>).sizeInches)}″ ${getString((model.specs.display as Record<string, unknown>).type)}`
-      : getString((model.specs.display as Record<string, unknown>).type))
-    : 'Not specified'
-  const advancedSpecs = Object.entries(model.specs).reduce<Record<string, Record<string, string>>>((groups, [name, value]) => {
-    if (value === null || value === undefined) return groups
-    if (typeof value === 'object' && !Array.isArray(value)) {
-      groups[name] = Object.fromEntries(Object.entries(value as Record<string, unknown>).filter(([, field]) => field !== null && field !== undefined).map(([key, field]) => [key, typeof field === 'object' ? JSON.stringify(field) : String(field)]))
-    } else {
-      groups['Key specifications'] ??= {}
-      groups['Key specifications'][name] = Array.isArray(value) ? value.map(String).join(', ') : String(value)
-    }
-    return groups
-  }, {})
+  const advancedSpecs = advancedSpecGroups(model.specs)
   const imagePaths = modelPhotos.length ? modelPhotos.map((photo) => photoUrl(photo.path)) : []
   const imageSet = imagePaths.length ? imagePaths : samplePhones.find((phone) => phone.slug === model.slug)?.images ?? placeholderImages(model.slug)
   return {
@@ -97,14 +83,7 @@ function toPhone(model: PublicModel, variant: PublicVariant, photos: PublicModel
     tradeInEligible: true,
     fiveG: model.specs.fiveG === true,
     ram: variant.ram_gb,
-    simpleSpecs: {
-      display,
-      camera: camera || 'Not specified',
-      battery: getNumber(model.specs.batteryMah) ? `${model.specs.batteryMah} mAh` : 'Not specified',
-      storage: `${variant.storage_gb} GB`,
-      ram: `${variant.ram_gb} GB`,
-      chipset: getString(model.specs.chipset),
-    },
+    simpleSpecs: shopSimpleSpecs(model.specs, variant.storage_gb, variant.ram_gb),
     advancedSpecs,
   }
 }
@@ -150,8 +129,8 @@ export async function getPublicCatalog(): Promise<Phone[]> {
       badges: [`Used · Grade ${unit.grade}`, ...(unit.display_status === 'sold' ? ['Sold'] : unit.display_status === 'reserved' ? ['Reserved'] : [])],
       popular: 1, createdAt: model.id, tradeInEligible: false, fiveG: model.specs.fiveG === true,
       ram: unit.ram_gb,
-      simpleSpecs: { display: 'Not specified', camera: 'Not specified', battery: 'Not specified', storage: `${unit.storage_gb} GB`, ram: `${unit.ram_gb} GB`, chipset: getString(model.specs.chipset) },
-      advancedSpecs: {},
+      simpleSpecs: shopSimpleSpecs(model.specs, unit.storage_gb, unit.ram_gb),
+      advancedSpecs: advancedSpecGroups(model.specs),
     }
   }).filter((phone): phone is Phone => phone !== null)
   return [...newPhones, ...usedPhones]

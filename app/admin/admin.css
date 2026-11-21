@@ -227,3 +227,11 @@ a.admin-stat:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
   .admin-login-main { align-items: start; padding: 24px 16px; }
   .admin-login-card { padding: 24px; }
 }
+
+/* Simple / Advanced switch above the specification boxes */
+.admin-spec-mode { display: flex; flex-direction: column; gap: 6px; }
+.admin-segmented { display: inline-flex; align-self: flex-start; gap: 4px; padding: 4px; border: 1px solid #dce2ea; border-radius: 8px; background: #f4f6fa; }
+.admin-segmented button { min-height: 36px; padding: 0 14px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-soft); font-size: 14px; font-weight: 600; cursor: pointer; }
+.admin-segmented button[aria-checked="true"] { background: #fff; color: #1d4ed8; box-shadow: 0 1px 4px rgba(16,24,40,.12); }
+.admin-segmented button:focus-visible { outline: 3px solid rgba(21,94,239,.25); }
+@media (max-width: 700px) { .admin-segmented { align-self: stretch; } .admin-segmented button { flex: 1; min-height: 44px; } }

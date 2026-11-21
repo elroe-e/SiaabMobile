@@ -19,3 +19,8 @@
 - Step 2 edits and pasted values survive Back→Next and Search again.
 - Checks run: typecheck, lint, all tests, next build pass. Not clicked through in a browser.
 - Missing from Wikipedia (sample): OnePlus 15, Poco F6, vivo X200, Honor Magic V3, realme GT 6 and others.
+
+## 2026-11-21 (done, NOT pushed yet): Simple / Advanced specs
+- Admin spec boxes (spec-fields.tsx) have a Simple/Advanced switch; Simple = size, refresh rate, chipset, main camera MP, battery, charging.
+- Shop: src/lib/specs/simple-specs.ts decides simple vs advanced; advanced list has plain labels; Advanced button only when advanced specs exist.
+- Also: grey example text removed from spec boxes (commit e7d599e); shop switcher highlight fixed (CSS used aria-selected).

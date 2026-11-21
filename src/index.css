@@ -268,7 +268,7 @@ p { color: var(--muted); line-height: 1.72; }
 .spec-mode-control > span { font-size: 11px; }
 .spec-switcher { display: inline-flex; align-items: center; gap: 3px; padding: 3px; border: 1px solid #e6eaf1; border-radius: 8px; background: #f4f6fa; }
 .spec-switcher button { min-height: 29px; padding: 0 11px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 600; transition: background .18s,color .18s,box-shadow .18s; }
-.spec-switcher button[aria-selected=true] { background: var(--white); color: var(--ink); box-shadow: 0 2px 5px rgba(25,42,70,.1); }
+.spec-switcher button[aria-checked=true] { background: var(--white); color: var(--ink); box-shadow: 0 2px 5px rgba(25,42,70,.1); }
 .empty-state { min-height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px; border: 1px dashed #cfd8e5; border-radius: 13px; background: rgba(255,255,255,.55); text-align: center; }
 .empty-icon { width: 48px; height: 48px; display: grid; place-items: center; margin-bottom: 15px; border-radius: 50%; color: var(--blue); background: var(--blue-pale); }
 .empty-state h2 { margin: 0 0 7px; font-size: 22px; }

@@ -217,7 +217,8 @@ const specLabels: Record<string, string> = { display: 'Display', camera: 'Camera
 
 export function KeySpecs({ phone, mode }: { phone: Phone; mode: SpecMode }) {
   const t = useT()
-  if (mode === 'simple') {
+  // A phone without advanced specifications always shows its simple ones.
+  if (mode === 'simple' || Object.keys(phone.advancedSpecs).length === 0) {
     // Blank specs are left out rather than shown as "Not specified".
     return <div className="key-spec-grid">{Object.entries(phone.simpleSpecs).filter(([, value]) => value && value !== 'Not specified').map(([key, value]) => {
       const Icon = specIcons[key as keyof typeof specIcons]
