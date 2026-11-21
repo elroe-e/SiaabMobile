@@ -129,42 +129,43 @@ export function editedMeta(before: Specs, after: Specs, meta: Specs): Specs {
 
 export function SpecFields({ value, onChange }: { value: SpecForm; onChange: (next: SpecForm) => void }) {
   const set = (key: keyof SpecForm) => (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => onChange({ ...value, [key]: event.target.value })
-  const field = (label: string, key: keyof SpecForm, placeholder = '', numeric = false) =>
-    <label className="admin-label">{label}<input value={value[key] as string} onChange={set(key)} placeholder={placeholder} inputMode={numeric ? 'decimal' : undefined} maxLength={120} /></label>
+  // No example text inside the boxes: grey examples were mistaken for found specifications.
+  const field = (label: string, key: keyof SpecForm, numeric = false) =>
+    <label className="admin-label">{label}<input value={value[key] as string} onChange={set(key)} inputMode={numeric ? 'decimal' : undefined} maxLength={120} /></label>
   const choice = (label: string, key: 'fiveG' | 'nfc' | 'esim') =>
     <label className="admin-label">{label}<select value={value[key]} onChange={set(key)}><option value="">Not known</option><option value="yes">Yes</option><option value="no">No</option></select></label>
   const setCamera = (index: number, key: keyof CameraRow, text: string) => onChange({ ...value, rear: value.rear.map((camera, at) => at === index ? { ...camera, [key]: text } : camera) })
 
   return <>
     <h3 className="admin-form-heading full">Screen</h3>
-    {field('Size (inches)', 'sizeInches', '6.7', true)}
-    {field('Type', 'displayType', 'AMOLED')}
-    {field('Resolution width (pixels)', 'resWidth', '1440', true)}
-    {field('Resolution height (pixels)', 'resHeight', '3120', true)}
-    {field('Refresh rate (Hz)', 'refreshRateHz', '120', true)}
-    {field('Brightness (nits)', 'brightnessNits', '2600', true)}
-    <div className="full">{field('Glass protection', 'protection', 'Gorilla Glass Victus 2')}</div>
+    {field('Size (inches)', 'sizeInches', true)}
+    {field('Type', 'displayType')}
+    {field('Resolution width (pixels)', 'resWidth', true)}
+    {field('Resolution height (pixels)', 'resHeight', true)}
+    {field('Refresh rate (Hz)', 'refreshRateHz', true)}
+    {field('Brightness (nits)', 'brightnessNits', true)}
+    <div className="full">{field('Glass protection', 'protection')}</div>
 
     <h3 className="admin-form-heading full">Performance</h3>
-    {field('Chipset', 'chipset', 'Snapdragon 8 Gen 3')}
-    {field('Operating system', 'os', 'Android 15')}
-    {field('CPU', 'cpu', 'Octa-core')}
-    {field('GPU', 'gpu', 'Adreno 750')}
+    {field('Chipset', 'chipset')}
+    {field('Operating system', 'os')}
+    {field('CPU', 'cpu')}
+    {field('GPU', 'gpu')}
 
     <h3 className="admin-form-heading full">Cameras</h3>
     {value.rear.map((camera, index) => <div key={index} className="admin-camera-row full">
-      <label className="admin-label">Rear camera {index + 1}<input value={camera.name} onChange={(event) => setCamera(index, 'name', event.target.value)} placeholder={index === 0 ? 'Main' : 'Ultra-wide'} maxLength={60} /></label>
-      <label className="admin-label">Megapixels<input value={camera.megapixels} onChange={(event) => setCamera(index, 'megapixels', event.target.value)} placeholder="50" inputMode="decimal" /></label>
-      <label className="admin-label">Details<input value={camera.details} onChange={(event) => setCamera(index, 'details', event.target.value)} placeholder="f/1.8, OIS" maxLength={120} /></label>
+      <label className="admin-label">Rear camera {index + 1}<input value={camera.name} onChange={(event) => setCamera(index, 'name', event.target.value)} maxLength={60} /></label>
+      <label className="admin-label">Megapixels<input value={camera.megapixels} onChange={(event) => setCamera(index, 'megapixels', event.target.value)} inputMode="decimal" /></label>
+      <label className="admin-label">Details<input value={camera.details} onChange={(event) => setCamera(index, 'details', event.target.value)} maxLength={120} /></label>
       {value.rear.length > 1 && <button type="button" className="admin-icon-button danger" aria-label={`Remove rear camera ${index + 1}`} title="Remove this camera" onClick={() => onChange({ ...value, rear: value.rear.filter((_, at) => at !== index) })}>×</button>}
     </div>)}
     {value.rear.length < 6 && <button type="button" className="button button-outline button-small full admin-add-camera" onClick={() => onChange({ ...value, rear: [...value.rear, emptyCamera()] })}>Add a rear camera</button>}
-    {field('Front camera megapixels', 'frontMp', '12', true)}
-    {field('Front camera details', 'frontDetails', 'f/2.2')}
+    {field('Front camera megapixels', 'frontMp', true)}
+    {field('Front camera details', 'frontDetails')}
 
     <h3 className="admin-form-heading full">Battery</h3>
-    {field('Battery (mAh)', 'batteryMah', '5000', true)}
-    {field('Charging (watts)', 'chargingWatts', '45', true)}
+    {field('Battery (mAh)', 'batteryMah', true)}
+    {field('Charging (watts)', 'chargingWatts', true)}
 
     <h3 className="admin-form-heading full">Connections</h3>
     {choice('5G', 'fiveG')}
@@ -172,11 +173,11 @@ export function SpecFields({ value, onChange }: { value: SpecForm; onChange: (ne
     {choice('eSIM', 'esim')}
 
     <h3 className="admin-form-heading full">Body</h3>
-    {field('Height (mm)', 'height', '162.8', true)}
-    {field('Width (mm)', 'width', '77.6', true)}
-    {field('Thickness (mm)', 'depth', '8.2', true)}
-    {field('Weight (grams)', 'weightGrams', '218', true)}
-    <div className="full">{field('Water resistance', 'waterRating', 'IP68')}</div>
+    {field('Height (mm)', 'height', true)}
+    {field('Width (mm)', 'width', true)}
+    {field('Thickness (mm)', 'depth', true)}
+    {field('Weight (grams)', 'weightGrams', true)}
+    <div className="full">{field('Water resistance', 'waterRating')}</div>
     <p className="admin-inline-note full">Leave a box empty if you don’t know it. Customers then see “Not specified”.</p>
   </>
 }
