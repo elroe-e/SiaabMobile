@@ -24,3 +24,6 @@
 - Admin spec boxes (spec-fields.tsx) have a Simple/Advanced switch; Simple = size, refresh rate, chipset, main camera MP, battery, charging.
 - Shop: src/lib/specs/simple-specs.ts decides simple vs advanced; advanced list has plain labels; Advanced button only when advanced specs exist.
 - Also: grey example text removed from spec boxes (commit e7d599e); shop switcher highlight fixed (CSS used aria-selected).
+
+## 2026-11-21: delete customer requests
+- Owner-only bin button on Customer requests (app/admin/leads/ui.tsx), DELETE in app/api/admin/leads/route.ts, tests in src/tests/leads-delete.test.tsx.

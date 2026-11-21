@@ -1,14 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { MessageCircle, Phone, Search } from 'lucide-react'
+import { MessageCircle, Phone, Search, Trash2 } from 'lucide-react'
 
 type Lead = { id: string; type: string; name: string; contact: string; payload: Record<string, unknown>; status: 'new' | 'contacted' | 'closed'; created_at: string }
 const typeLabels: Record<string, string> = { notify_me: 'Upcoming reminders', trade_in: 'Trade-in', contact: 'Contact', reservation: 'Reservation' }
 const labelType = (value: string) => typeLabels[value] ?? value.replaceAll('_', ' ')
 const waLink = (contact: string) => `https://wa.me/${contact.replace(/\D/g, '')}`
 
-export function LeadsManager() {
+export function LeadsManager({ role }: { role: 'owner' | 'staff' }) {
   const [leads, setLeads] = useState<Lead[]>([])
   const [filter, setFilter] = useState('all')
   const [type, setType] = useState('all')
@@ -16,6 +16,7 @@ export function LeadsManager() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState('')
+  const [notice, setNotice] = useState('')
   const load = useCallback(async () => {
     const response = await fetch('/api/admin/leads', { cache: 'no-store' })
     const result = await response.json()
@@ -39,9 +40,21 @@ export function LeadsManager() {
     else await load()
   }
 
+  const remove = async (lead: Lead) => {
+    if (!window.confirm(`Delete the request from ${lead.name}? This cannot be undone.`)) return
+    setBusyId(lead.id); setError(''); setNotice('')
+    const response = await fetch('/api/admin/leads', { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: lead.id }) })
+    const result = await response.json().catch(() => ({}))
+    setBusyId('')
+    if (!response.ok) { setError(result.error ?? 'Could not delete this request.'); return }
+    setLeads((current) => current.filter((item) => item.id !== lead.id))
+    setNotice(`Deleted the request from ${lead.name}.`)
+  }
+
   return <section>
     <div className="admin-page-heading"><div><h2>Customer requests</h2><p>Trade-in, contact and notify-me requests from the storefront</p></div><span className="admin-badge">{leads.filter((lead) => lead.status === 'new').length} new</span></div>
     {error && <div className="admin-error" role="alert">{error}</div>}
+    {notice && <div className="admin-success" role="status">{notice}</div>}
     <div className="admin-card">
       <div className="admin-toolbar"><div className="admin-toolbar-left"><select className="admin-input" aria-label="Request type" value={type} onChange={(event) => setType(event.target.value)}><option value="all">All request types</option>{Object.entries(typeLabels).map(([value, label]) => <option key={value} value={value}>{label} · {leads.filter((lead) => lead.type === value).length}</option>)}</select><div className="admin-tabs" role="tablist" aria-label="Request status">{['all', 'new', 'contacted', 'closed'].map((status) => <button key={status} role="tab" aria-selected={filter === status} className={filter === status ? 'active' : ''} onClick={() => setFilter(status)}>{status === 'all' ? `All · ${leads.length}` : `${status} · ${leads.filter((lead) => lead.status === status).length}`}</button>)}</div></div><label className="input-icon-wrap admin-search-wrap"><Search size={16} /><input className="admin-input admin-search" placeholder="Search name, contact or details…" value={search} onChange={(event) => setSearch(event.target.value)} /></label></div>
       {loading ? <div className="admin-empty">Loading requests…</div> : visible.length === 0 ? <div className="admin-empty">No requests match your filters.</div> : <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Customer</th><th>Request</th><th>Details</th><th>Received</th><th>Status</th><th>Contact / action</th></tr></thead>
@@ -50,7 +63,7 @@ export function LeadsManager() {
           <td className="admin-cell-wrap"><small>{Object.entries(lead.payload ?? {}).filter(([key]) => key !== 'internalNote').map(([key, value]) => `${key}: ${typeof value === 'object' ? JSON.stringify(value) : String(value)}`).join(' · ') || '—'}</small>{typeof lead.payload?.internalNote === 'string' && lead.payload.internalNote && <small>Staff note: {lead.payload.internalNote}</small>}</td>
           <td>{new Date(lead.created_at).toLocaleString()}</td>
           <td><select className="admin-select" aria-label={`Status for ${lead.name}`} value={lead.status} disabled={busyId === lead.id} onChange={(event) => void update(lead, { status: event.target.value })}><option value="new">New</option><option value="contacted">Contacted</option><option value="closed">Closed</option></select></td>
-          <td><div className="admin-table-actions"><a className="admin-icon-button" href={`tel:${lead.contact}`} title="Call customer"><Phone size={16} /></a><a className="admin-icon-button" href={waLink(lead.contact)} target="_blank" rel="noreferrer" title="WhatsApp customer"><MessageCircle size={16} /></a><button className="admin-icon-button" title="Add an internal note" onClick={() => { const note = window.prompt('Internal staff note:', typeof lead.payload.internalNote === 'string' ? lead.payload.internalNote : ''); if (note !== null) void update(lead, { internalNote: note }) }}>✎</button></div></td>
+          <td><div className="admin-table-actions"><a className="admin-icon-button" href={`tel:${lead.contact}`} title="Call customer"><Phone size={16} /></a><a className="admin-icon-button" href={waLink(lead.contact)} target="_blank" rel="noreferrer" title="WhatsApp customer"><MessageCircle size={16} /></a><button className="admin-icon-button" title="Add an internal note" onClick={() => { const note = window.prompt('Internal staff note:', typeof lead.payload.internalNote === 'string' ? lead.payload.internalNote : ''); if (note !== null) void update(lead, { internalNote: note }) }}>✎</button>{role === 'owner' && <button className="admin-icon-button danger" title="Delete this request" aria-label={`Delete the request from ${lead.name}`} disabled={busyId === lead.id} onClick={() => void remove(lead)}><Trash2 size={16} /></button>}</div></td>
         </tr>)}</tbody></table></div>}
     </div>
   </section>

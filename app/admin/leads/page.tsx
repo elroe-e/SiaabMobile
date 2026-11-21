@@ -8,5 +8,5 @@ export const dynamic = 'force-dynamic'
 
 export default async function LeadsPage() {
   const { profile } = await requireAdminPage()
-  return <AdminShell name={profile.full_name} role={profile.role}><LeadsManager /></AdminShell>
+  return <AdminShell name={profile.full_name} role={profile.role}><LeadsManager role={profile.role} /></AdminShell>
 }

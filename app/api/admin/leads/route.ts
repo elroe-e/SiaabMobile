@@ -7,6 +7,7 @@ const updateSchema = z.object({
   status: z.enum(['new', 'contacted', 'closed']).optional(),
   internalNote: z.string().max(1000).optional(),
 }).strict()
+const deleteSchema = z.object({ id: z.string().uuid() }).strict()
 
 export async function GET() {
   try {
@@ -40,6 +41,24 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ ok: true })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Could not update the request.'
+    return NextResponse.json({ error: message }, { status: message.includes('Authentication') || message.includes('permission') ? 403 : 500 })
+  }
+}
+
+/** Deletes a customer request for good. Owner only, like deleting inventory. */
+export async function DELETE(request: Request) {
+  const parsed = deleteSchema.safeParse(await request.json().catch(() => null))
+  if (!parsed.success) return NextResponse.json({ error: 'Invalid deletion request.' }, { status: 400 })
+  try {
+    const { db } = await requireAdmin('owner')
+    const { data: lead, error: readError } = await db.from('leads').select('id').eq('id', parsed.data.id).maybeSingle()
+    if (readError) return NextResponse.json({ error: readError.message }, { status: 500 })
+    if (!lead) return NextResponse.json({ error: 'Customer request not found.' }, { status: 404 })
+    const { error } = await db.from('leads').delete().eq('id', parsed.data.id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Could not delete the request.'
     return NextResponse.json({ error: message }, { status: message.includes('Authentication') || message.includes('permission') ? 403 : 500 })
   }
 }
