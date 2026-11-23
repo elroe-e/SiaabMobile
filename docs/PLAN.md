@@ -27,3 +27,8 @@
 
 ## 2026-11-21: delete customer requests
 - Owner-only bin button on Customer requests (app/admin/leads/ui.tsx), DELETE in app/api/admin/leads/route.ts, tests in src/tests/leads-delete.test.tsx.
+
+## 2026-11-23: deleting a sold phone hides it
+- Migration 005_hidden_stock: hidden_at on variants/used_units; public views skip hidden; restock_from_sale and undo_sale unhide.
+- Inventory DELETE hides when sales exist; GET, Overview and sale picker skip hidden; re-adding the same colour/RAM/storage unhides.
+- Tests: src/tests/inventory-hide.test.ts (real test database).

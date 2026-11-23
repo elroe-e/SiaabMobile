@@ -56,8 +56,8 @@ export async function GET(request: Request) {
     const type = url.searchParams.get('type') ?? 'all'
     const [models, variants, used, ownerUnits] = await Promise.all([
       db.from('phone_models').select('id,brand_id,name,slug,status,expected_date,expected_price_range,tagline,specs,spec_meta,specs_reviewed,created_at,brands(name)').order('updated_at', { ascending: false }),
-      type === 'used' ? Promise.resolve({ data: [], error: null }) : db.from('variants').select('*,phone_models(name,slug,specs_reviewed,brands(name))').order('created_at', { ascending: false }),
-      type === 'new' ? Promise.resolve({ data: [], error: null }) : db.from('used_units').select('id,model_id,ram_gb,storage_gb,color_name,grade,battery_health_pct,accessories,warranty_months,price,status,is_published,reserved_until,sold_at,created_at,phone_models(name,slug,specs_reviewed,brands(name))').order('created_at', { ascending: false }),
+      type === 'used' ? Promise.resolve({ data: [], error: null }) : db.from('variants').select('*,phone_models(name,slug,specs_reviewed,brands(name))').is('hidden_at', null).order('created_at', { ascending: false }),
+      type === 'new' ? Promise.resolve({ data: [], error: null }) : db.from('used_units').select('id,model_id,ram_gb,storage_gb,color_name,grade,battery_health_pct,accessories,warranty_months,price,status,is_published,reserved_until,sold_at,created_at,phone_models(name,slug,specs_reviewed,brands(name))').is('hidden_at', null).order('created_at', { ascending: false }),
       type === 'new' || profile.role !== 'owner' ? Promise.resolve({ data: [], error: null }) : db.from('admin_used_units').select('id,cost_price,imei,notes_internal'),
     ])
     const error = models.error ?? variants.error ?? used.error ?? ownerUnits.error
@@ -101,7 +101,16 @@ export async function POST(request: Request) {
       if (lookupError) return NextResponse.json({ error: lookupError.message }, { status: 500 })
       if (existing) {
         if (input.isPublished && !existing.specs_reviewed) return NextResponse.json({ error: 'Confirm model specifications before publishing.' }, { status: 400 })
-        const { error: insertError } = await db.from('variants').insert(variantRows(existing.id, colors, input.isPublished))
+        // A colour/RAM/storage that was hidden after being sold comes back with the new price and quantity instead of failing as a duplicate.
+        const { data: same, error: sameError } = await db.from('variants').select('id,color_name,hidden_at').eq('model_id', existing.id).eq('ram_gb', input.variant!.ramGb).eq('storage_gb', input.variant!.storageGb)
+        if (sameError) return NextResponse.json({ error: sameError.message }, { status: 500 })
+        const hidden = new Map((same ?? []).filter((row) => row.hidden_at).map((row) => [String(row.color_name).toLowerCase(), row.id as string]))
+        for (const row of variantRows(existing.id, colors.filter((name) => hidden.has(name.toLowerCase())), input.isPublished)) {
+          const { error: showError } = await db.from('variants').update({ ...row, hidden_at: null }).eq('id', hidden.get(row.color_name.toLowerCase()))
+          if (showError) return NextResponse.json({ error: showError.message }, { status: 400 })
+        }
+        const fresh = colors.filter((name) => !hidden.has(name.toLowerCase()))
+        const { error: insertError } = fresh.length ? await db.from('variants').insert(variantRows(existing.id, fresh, input.isPublished)) : { error: null }
         if (insertError) return NextResponse.json({ error: insertError.message.includes('duplicate') ? 'That colour, RAM and storage combination already exists for this phone.' : insertError.message }, { status: 400 })
         return NextResponse.json({ modelId: existing.id, existingModel: true }, { status: 201 })
       }
@@ -222,12 +231,25 @@ export async function DELETE(request: Request) {
     const { db, profile } = await requireAdmin('owner')
     const { type, id } = parsed.data
     if (type === 'model') {
-      const [variants, units] = await Promise.all([
-        db.from('variants').select('id', { count: 'exact', head: true }).eq('model_id', id),
-        db.from('used_units').select('id', { count: 'exact', head: true }).eq('model_id', id),
+      const [variants, units, hiddenVariants, hiddenUnits] = await Promise.all([
+        db.from('variants').select('id', { count: 'exact', head: true }).eq('model_id', id).is('hidden_at', null),
+        db.from('used_units').select('id', { count: 'exact', head: true }).eq('model_id', id).is('hidden_at', null),
+        db.from('variants').select('id', { count: 'exact', head: true }).eq('model_id', id).not('hidden_at', 'is', null),
+        db.from('used_units').select('id', { count: 'exact', head: true }).eq('model_id', id).not('hidden_at', 'is', null),
       ])
-      if (variants.error || units.error) return NextResponse.json({ error: variants.error?.message ?? units.error?.message }, { status: 500 })
+      const countError = variants.error ?? units.error ?? hiddenVariants.error ?? hiddenUnits.error
+      if (countError) return NextResponse.json({ error: countError.message }, { status: 500 })
       if ((variants.count ?? 0) > 0 || (units.count ?? 0) > 0) return NextResponse.json({ error: 'This model has stock records; delete those records first.' }, { status: 409 })
+      if ((hiddenVariants.count ?? 0) > 0 || (hiddenUnits.count ?? 0) > 0) return NextResponse.json({ error: 'This model has sales history, so it stays saved for your sales records.' }, { status: 409 })
+    } else {
+      // A phone that has been sold is hidden instead of deleted, so Sales history keeps its name and totals.
+      const sold = await db.from('sales').select('id', { count: 'exact', head: true }).eq(type === 'variant' ? 'variant_id' : 'unit_id', id)
+      if (sold.error) return NextResponse.json({ error: sold.error.message }, { status: 500 })
+      if ((sold.count ?? 0) > 0) {
+        const { error } = await db.from(type === 'variant' ? 'variants' : 'used_units').update({ hidden_at: new Date().toISOString() }).eq('id', id)
+        if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+        return NextResponse.json({ ok: true, hidden: true, actor: profile.id })
+      }
     }
     const table = type === 'model' ? 'phone_models' : type === 'variant' ? 'variants' : 'used_units'
     const { error } = await db.from(table).delete().eq('id', id)

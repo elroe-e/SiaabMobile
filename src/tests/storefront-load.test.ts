@@ -33,7 +33,7 @@ describe('what the shop pages load', () => {
     expect(shop.mapUrl).toBe('https://maps.app.goo.gl/one')
     expect(shop.second).toEqual({ address: 'Bole, Addis Ababa', mapUrl: 'https://maps.app.goo.gl/two' })
     await test.close()
-  })
+  }, 30_000) // Builds a whole test database, which is slow when every test file runs at once.
 
   it('opens without phones, never with the demo catalogue, when the database is down', async () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined)

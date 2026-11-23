@@ -9,7 +9,11 @@ vi.mock('../lib/auth/session', () => ({
     db: {
       from: (table: string) => ({
         select: () => ({
-          eq: () => ({ maybeSingle: async () => ({ data: table === 'variants' ? { model_id: 'model-9' } : state.existing, error: null }) }),
+          eq: () => {
+            // Single-row lookups use maybeSingle(); the hidden-variant check awaits a list after more eq() filters.
+            const chain = { eq: () => chain, maybeSingle: async () => ({ data: table === 'variants' ? { model_id: 'model-9' } : state.existing, error: null }), then: (resolve: (value: unknown) => void) => resolve({ data: [], error: null }) }
+            return chain
+          },
           ilike: (_column: string, pattern: string) => { state.brandQueries.push(pattern); return { limit: () => ({ maybeSingle: async () => ({ data: state.knownBrand, error: null }) }) } },
         }),
         insert: async (rows: Record<string, unknown>[]) => { state.inserted.push(rows); return { error: null } },

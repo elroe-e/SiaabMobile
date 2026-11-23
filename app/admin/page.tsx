@@ -15,11 +15,11 @@ export default async function AdminDashboard() {
   const { db, profile } = await requireAdminPage()
   const [models, variants, units, leads, sales, lowStock, latestLeads] = await Promise.all([
     db.from('phone_models').select('id', { count: 'exact', head: true }),
-    db.from('variants').select('id', { count: 'exact', head: true }),
-    db.from('used_units').select('id', { count: 'exact', head: true }),
+    db.from('variants').select('id', { count: 'exact', head: true }).is('hidden_at', null),
+    db.from('used_units').select('id', { count: 'exact', head: true }).is('hidden_at', null),
     db.from('leads').select('id', { count: 'exact', head: true }).eq('status', 'new'),
     db.from('sales').select('sale_price,sold_at,kind,undone_at').is('undone_at', null).gte('sold_at', new Date(Date.now() - 7 * 86400000).toISOString()).order('sold_at', { ascending: true }),
-    db.from('variants').select('id,stock_count,low_stock_threshold,model_id,phone_models(name,brands(name))').lte('stock_count', 2).limit(8),
+    db.from('variants').select('id,stock_count,low_stock_threshold,model_id,phone_models(name,brands(name))').is('hidden_at', null).lte('stock_count', 2).limit(8),
     db.from('leads').select('id,type,name,contact,status,created_at').order('created_at', { ascending: false }).limit(5),
   ])
   const error = models.error ?? variants.error ?? units.error ?? leads.error ?? sales.error ?? lowStock.error ?? latestLeads.error

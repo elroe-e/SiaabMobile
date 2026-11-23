@@ -102,11 +102,11 @@ export function InventoryManager({ role }: { role: Role }) {
   }
 
   const deleteItem = async (id: string, type: 'model' | 'variant' | 'unit', label: string) => {
-    if (role !== 'owner' || !window.confirm(`Permanently delete ${label}? This cannot be undone.`)) return
+    if (role !== 'owner' || !window.confirm(`Delete ${label}? This cannot be undone. A phone that has been sold before is hidden instead, so its sales history stays.`)) return
     const response = await fetch('/api/admin/inventory', { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, type }) })
     const result = await response.json()
     if (!response.ok) setError(result.error ?? 'Could not delete inventory.')
-    else { setNotice(`${label} deleted.`); await refresh() }
+    else { setNotice(result.hidden ? `${label} removed from inventory and the shop. Its sales stay in Sales history; Restock on one of them brings it back.` : `${label} deleted.`); await refresh() }
   }
 
   return <section>
